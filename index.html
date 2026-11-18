@@ -1,0 +1,1437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5bd8">
+<meta name="description" content="Workouts that adapt to where you are and what you have, a daily training log, and healthy meals for your location.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Fitshift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root { color-scheme: light; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) }
+body { margin: 0; font: 14px system-ui, sans-serif }
+img { max-width: 100% }
+[hidden] { display: none !important }
+</style>
+</head>
+<body>
+<style>
+/* Layout: app bar with three modes (Today / Train / Eat); settings column on the left, live plan on the right; stacks on phones. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #142029;
+  --muted: #5b6a76;
+  --line: #d5dce2;
+  --accent: #1f5bd8;      /* train: track blue */
+  --accent-ink: #ffffff;
+  --food: #c4511c;        /* eat: paprika */
+  --chip: #e3e9ef;
+  --done: #2c8a57;
+  --warn: #a8660b;        /* recovering */
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151a; --surface: #172028; --ink: #e6edf2; --muted: #93a3b0; --line: #2a3742;
+  --accent: #6d9cff; --accent-ink: #0b1220; --food: #f08a55; --chip: #22303b; --done: #5cc98c; --warn: #e3a64a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151a; --surface: #172028; --ink: #e6edf2; --muted: #93a3b0; --line: #2a3742;
+  --accent: #6d9cff; --accent-ink: #0b1220; --food: #f08a55; --chip: #22303b; --done: #5cc98c; --warn: #e3a64a; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 48px }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg) }
+.wrap { max-width: 1120px; margin: 0 auto }
+header.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-block: 16px 12px; border-bottom: 1px solid var(--line) }
+.brand { font-family: var(--display); font-weight: 800; font-size: 30px; letter-spacing: .5px; text-transform: uppercase; line-height: 1 }
+.brand span { color: var(--accent) }
+body.eat .brand span { color: var(--food) }
+.modes { display: flex; background: var(--chip); border-radius: 999px; padding: 4px; gap: 4px }
+.modes button { border: 0; background: transparent; color: var(--muted); font: 600 14px var(--body); padding: 8px 18px; border-radius: 999px; cursor: pointer }
+.modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12) }
+.lede { color: var(--muted); max-width: 62ch; margin: 18px 0 6px }
+
+.grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 28px; margin-top: 18px; align-items: start }
+@media (max-width: 820px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.panel { display: flex; flex-direction: column; gap: 20px }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+legend, .label { font: 700 13px var(--display); text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 8px; padding: 0 }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { border: 1px solid transparent; background: var(--chip); color: var(--ink); font: 500 13.5px var(--body); padding: 7px 12px; border-radius: 8px; cursor: pointer; line-height: 1.2 }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+body.eat .chip[aria-pressed="true"] { background: var(--food); color: #fff }
+.chip:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.sit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px }
+.sit .chip { text-align: left; padding: 10px 12px }
+.sit .chip small { display: block; font-size: 12px; opacity: .75; margin-top: 2px }
+input[type="text"], select, textarea { width: 100%; font: 15px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px }
+textarea { resize: vertical; min-height: 70px }
+.btn { border: 0; background: var(--accent); color: var(--accent-ink); font: 700 16px var(--display); letter-spacing: 1px; text-transform: uppercase; padding: 12px 18px; border-radius: 8px; cursor: pointer }
+body.eat .btn { background: var(--food); color: #fff }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.btn[disabled] { opacity: .5; cursor: progress }
+
+.plan { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; min-width: 0 }
+.plan-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap }
+.plan h2 { font: 800 34px/1 var(--display); text-transform: uppercase; margin: 0; text-wrap: balance }
+.meta { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums }
+.adapt { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 6px; align-items: center }
+.adapt .label { margin: 0 6px 0 0 }
+.adapt button { border: 1px dashed var(--line); background: transparent; color: var(--ink); font: 500 13px var(--body); padding: 6px 10px; border-radius: 8px; cursor: pointer }
+.adapt button:hover { border-color: var(--accent) }
+.block-title { font: 700 14px var(--display); text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); margin: 22px 0 8px; display: flex; justify-content: space-between; gap: 8px }
+ol.ex { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line) }
+ol.ex > li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start }
+.check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line); background: transparent; cursor: pointer; margin-top: 2px; display: grid; place-items: center; color: transparent; font-size: 13px; padding: 0 }
+li.done .check { background: var(--done); border-color: var(--done); color: #fff }
+li.done .ex-name { text-decoration: line-through; color: var(--muted) }
+.ex-name { font-weight: 600 }
+.ex-rx { font: 500 13px var(--mono); color: var(--accent); margin-left: 6px; white-space: nowrap }
+.ex-cue { color: var(--muted); font-size: 13.5px; margin-top: 2px }
+.tag { display: inline-block; font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .6px; color: var(--muted); background: var(--chip); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px }
+.swaps { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 170px }
+.swaps button { border: 1px solid var(--line); background: transparent; color: var(--muted); font: 500 12px var(--body); padding: 4px 8px; border-radius: 6px; cursor: pointer }
+.swaps button:hover { color: var(--ink); border-color: var(--ink) }
+@media (max-width: 520px) { ol.ex > li { grid-template-columns: 28px minmax(0, 1fr) } .swaps { grid-column: 2; justify-content: flex-start; max-width: none } }
+.note { font-size: 13.5px; color: var(--muted); margin-top: 14px }
+.flash { animation: flash .8s ease-out }
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 18%, transparent) } to { background: transparent } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none } }
+
+.meals { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 10px }
+.meal { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.meal h3 { margin: 0; font: 700 20px/1.1 var(--display); text-transform: uppercase; letter-spacing: .3px }
+.meal .where { font-size: 12.5px; color: var(--muted) }
+.meal .order { font-size: 13.5px }
+.meal .order b { color: var(--food) }
+.macros { display: flex; gap: 14px; font: 500 12.5px var(--mono); color: var(--muted); margin-top: auto; padding-top: 6px; font-variant-numeric: tabular-nums }
+.macros strong { color: var(--ink); font-weight: 500 }
+.ai-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px }
+.status { font-size: 13px; color: var(--muted) }
+.status.err { color: var(--food) }
+.example { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: 1px; background: var(--chip); color: var(--muted); padding: 3px 8px; border-radius: 4px }
+
+/* inventory + custom places */
+.add-row { display: flex; gap: 6px }
+.add-row input { flex: 1; min-width: 0 }
+.add-row button, .small-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 13px var(--body); padding: 8px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap }
+.chip .x { margin-left: 6px; opacity: .7; font-weight: 700 }
+.chip.unknown { border: 1px dashed var(--muted); background: transparent }
+.chip.unknown[aria-pressed="true"] { border-style: dashed; border-color: var(--accent); background: transparent; color: var(--ink) }
+.hint { font-size: 12.5px; color: var(--muted) }
+.link-btn { background: none; border: 0; color: var(--accent); font: 500 13px var(--body); padding: 0; cursor: pointer; text-align: left }
+
+/* exercise name as demo toggle */
+.ex-name { background: none; border: 0; padding: 0; font: 600 15px var(--body); color: var(--ink); cursor: pointer; text-align: left; text-decoration: underline dotted var(--muted); text-underline-offset: 3px }
+.ex-name::after { content: " ▸"; color: var(--muted); font-size: 12px }
+.ex-name[aria-expanded="true"]::after { content: " ▾" }
+.mine { color: var(--accent) }
+
+/* how-to panel */
+.demo { grid-column: 2 / -1; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; background: var(--bg); border-radius: 10px; padding: 14px }
+@media (max-width: 620px) { .demo { grid-template-columns: minmax(0, 1fr); grid-column: 1 / -1 } }
+.demo canvas { width: 100%; max-width: 240px; aspect-ratio: 4 / 3; height: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--line); display: block }
+.demo ol { margin: 0; padding-left: 18px; font-size: 13.5px; display: flex; flex-direction: column; gap: 4px }
+.demo .side { display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+.demo .links { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 13px }
+.demo a { color: var(--accent); font-weight: 600 }
+.media img, .media video { width: 100%; max-width: 360px; border-radius: 8px; border: 1px solid var(--line); display: block; background: #000 }
+.media { display: flex; flex-direction: column; gap: 6px }
+.file-label { display: inline-block; border: 1px dashed var(--line); padding: 8px 12px; border-radius: 8px; font: 600 13px var(--body); cursor: pointer; background: var(--surface) }
+.file-label input { position: absolute; opacity: 0; width: 1px; height: 1px }
+.file-label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px }
+
+/* add a move */
+.add-move { display: flex; flex-direction: column; gap: 8px; margin-top: 12px }
+.add-move .row { display: flex; gap: 6px; flex-wrap: wrap }
+.add-move select { flex: 1; min-width: 180px; width: auto }
+.create { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; background: var(--bg); padding: 12px; border-radius: 10px }
+.create .full { grid-column: 1 / -1 }
+@media (max-width: 520px) { .create { grid-template-columns: minmax(0, 1fr) } }
+.create label { font-size: 12.5px; color: var(--muted); display: flex; flex-direction: column; gap: 4px }
+
+/* today */
+.today-stack { display: grid; gap: 24px; margin-top: 18px }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start }
+@media (max-width: 820px) { .two { grid-template-columns: minmax(0, 1fr) } }
+.two .block-title { margin-top: 0 }
+.ready-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px }
+.mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.mcard h4 { margin: 0; font: 700 18px/1.1 var(--display); text-transform: uppercase; letter-spacing: .3px }
+.mcard .detail { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums }
+.pill { font: 600 11px/1.6 var(--body); text-transform: uppercase; letter-spacing: .6px; padding: 1px 8px; border-radius: 999px; align-self: flex-start; white-space: nowrap }
+.pill.fresh { background: color-mix(in srgb, var(--done) 16%, transparent); color: var(--done) }
+.pill.recovering { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn) }
+.pill.sore { background: color-mix(in srgb, var(--food) 16%, transparent); color: var(--food) }
+.pill.none { background: var(--chip); color: var(--muted) }
+.pill.ease { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent) }
+.sore-btn { align-self: flex-start; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 500 12px var(--body); padding: 3px 8px; border-radius: 6px; cursor: pointer; margin-top: auto }
+.sore-btn[aria-pressed="true"] { border-color: var(--food); color: var(--food) }
+.banner { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; margin-top: 14px }
+.banner p { margin: 0; font-weight: 600 }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+ul.reasons { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line) }
+ul.reasons li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: baseline; font-size: 14px }
+ul.reasons li b { font: 700 15px var(--display); text-transform: uppercase; letter-spacing: .3px }
+@media (max-width: 480px) { ul.reasons li { grid-template-columns: minmax(0, 1fr); gap: 2px } }
+.ask { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; margin-top: 10px }
+.ask p { margin: 0; font-weight: 600 }
+.log-day { margin-top: 14px }
+.log-day h4 { margin: 0 0 6px; font: 700 14px var(--display); text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted) }
+.log-entry { border-top: 1px solid var(--line); padding: 10px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px }
+.log-entry .t { font: 500 12.5px var(--mono); color: var(--muted) }
+.log-entry .what { font-weight: 600 }
+.log-entry .mus { font-size: 13px; color: var(--muted) }
+.outside { display: flex; flex-direction: column; gap: 10px; background: var(--bg); padding: 12px; border-radius: 10px; margin-top: 12px }
+.outside label { font-size: 12.5px; color: var(--muted); display: flex; flex-direction: column; gap: 4px }
+input[type="datetime-local"] { font: 15px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; max-width: 100% }
+.log-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px }
+.focus-line { font-size: 13.5px; margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline }
+</style>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">Fit<span>shift</span></div>
+    <div class="modes" role="group" aria-label="Mode">
+      <button id="mode-today" aria-pressed="false">Today</button>
+      <button id="mode-train" aria-pressed="true">Train</button>
+      <button id="mode-eat" aria-pressed="false">Eat</button>
+    </div>
+  </header>
+
+  <!-- TODAY -->
+  <section id="today" hidden>
+    <p class="lede">Picks your next session from what you've actually trained. Muscle groups stay "Recovering" for 48 hours after a logged workout, then turn "Fresh".</p>
+    <div class="today-stack">
+      <article class="plan" id="rec" aria-live="polite"></article>
+      <div class="two">
+        <section>
+          <div class="block-title"><span>Muscle readiness</span><span id="ready-clock"></span></div>
+          <div class="ready-grid" id="ready"></div>
+          <p class="note">"Fresh" is an estimate based on your logged workouts and the soreness you report. It isn't a guarantee that you've recovered.</p>
+        </section>
+        <article class="plan" id="log"></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRAIN -->
+  <section id="train">
+    <p class="lede">Tell it where you are and what you have. The workout rebuilds around it, and you can swap any move mid-session when a machine is taken or something doesn't feel right.</p>
+    <div class="grid">
+      <div class="panel">
+        <fieldset><legend>Where are you?</legend><div class="sit" id="situations"></div>
+          <div id="place-tools"></div></fieldset>
+        <fieldset><legend>What do you have?</legend><div class="chips" id="equipment"></div>
+          <form class="add-row" id="add-item">
+            <input type="text" id="item-input" list="item-ideas" placeholder="Add anything: kettlebell, backpack, stairs…" aria-label="Add equipment">
+            <button type="submit">Add</button>
+          </form>
+          <datalist id="item-ideas"></datalist>
+          <div class="hint" id="item-hint">Tap an item to turn it on or off. Things the planner doesn't know yet are passed to Claude when you use "Build with Claude".</div>
+        </fieldset>
+        <fieldset><legend>Time</legend><div class="chips" id="times"></div></fieldset>
+        <fieldset><legend>Goal</legend><div class="chips" id="goals"></div></fieldset>
+        <fieldset><legend>Level</legend><div class="chips" id="levels"></div></fieldset>
+        <fieldset><legend>Constraints</legend><div class="chips" id="constraints"></div></fieldset>
+        <fieldset id="ai-train" hidden>
+          <legend>Or describe it</legend>
+          <textarea id="describe" placeholder="e.g. Airport lounge, 15 min, carry-on bag only, sore shoulder. Leave empty to use everything you've added above."></textarea>
+          <button class="btn ghost" id="ask-workout">Build with Claude</button>
+          <div class="status" id="train-status"></div>
+        </fieldset>
+      </div>
+      <article class="plan" id="workout" aria-live="polite"></article>
+    </div>
+  </section>
+
+  <!-- EAT -->
+  <section id="eat" hidden>
+    <p class="lede">Healthy picks that exist where you actually are: local dishes, the usual chains, and what to grab when all you've got is a corner shop or an airport.</p>
+    <div class="grid">
+      <div class="panel">
+        <fieldset><legend>Where are you?</legend>
+          <input type="text" id="city" placeholder="City, e.g. Lagos, London, Austin" autocomplete="address-level2">
+          <select id="region" aria-label="Food region"></select>
+        </fieldset>
+        <fieldset><legend>Situation</legend><div class="chips" id="food-sits"></div></fieldset>
+        <fieldset><legend>Goal</legend><div class="chips" id="food-goals"></div></fieldset>
+        <fieldset><legend>Diet</legend><div class="chips" id="diets"></div></fieldset>
+      </div>
+      <article class="plan" id="food" aria-live="polite"></article>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------------- data: exercises ---------------- */
+// needs: equipment all required; flags: L=loud/jumping, S=needs space, K=knee-heavy, B=back-heavy
+const EX = [
+ // squat
+ ["bw-squat","Bodyweight squat","squat",[],1,"","Sit between your heels, chest tall, knees track over toes."],
+ ["tempo-squat","3-1-3 tempo squat","squat",[],2,"","3 s down, 1 s pause, 3 s up. Slow is the load."],
+ ["split-squat","Bulgarian split squat","squat",["chair"],2,"K","Back foot on a chair or bench, front shin near vertical."],
+ ["box-pistol","Pistol squat to chair","squat",["chair"],3,"K","One leg, sit back to the chair, stand without rocking."],
+ ["jump-squat","Jump squat","squat",[],2,"LK","Land soft and quiet, reset each rep."],
+ ["goblet-squat","Goblet squat","squat",["dumbbells"],1,"","Hold one dumbbell at the chest, elbows inside knees."],
+ ["db-front-squat","Dumbbell front squat","squat",["dumbbells"],2,"","Two dumbbells on the shoulders, stay upright."],
+ ["back-squat","Barbell back squat","squat",["barbell"],3,"B","Brace before you descend, hit depth you own."],
+ ["leg-press","Leg press","squat",["machine"],1,"","Full range without your lower back peeling off the pad."],
+ ["band-squat","Banded squat","squat",["bands"],1,"","Stand on the band, handles at shoulders."],
+ ["wall-sit","Wall sit","squat",[],1,"K","Thighs parallel, back flat on the wall. Hold."],
+ // hinge
+ ["glute-bridge","Glute bridge","hinge",[],1,"","Drive through heels, squeeze at the top for a second."],
+ ["sl-bridge","Single-leg glute bridge","hinge",[],2,"","Hips stay level. Switch sides each set."],
+ ["good-morning","Bodyweight good morning","hinge",[],1,"","Hands behind head, push hips back, soft knees."],
+ ["sl-rdl","Single-leg Romanian deadlift","hinge",[],2,"","Reach long from head to back heel, hips square."],
+ ["hip-thrust","Hip thrust off a bench","hinge",["chair"],2,"","Upper back on a bench, couch or bed edge."],
+ ["db-rdl","Dumbbell Romanian deadlift","hinge",["dumbbells"],2,"B","Bells slide down the thighs, flat back."],
+ ["bb-deadlift","Barbell deadlift","hinge",["barbell"],3,"B","Bar over midfoot, push the floor away."],
+ ["band-pull","Band pull-through","hinge",["bands"],1,"","Anchor low behind you, snap hips forward."],
+ ["ham-curl","Lying hamstring curl","hinge",["machine"],1,"","Control the way down, 2 s."],
+ // push
+ ["pushup","Push-up","push",[],2,"","Body in one line, chest to fist height off the floor."],
+ ["incline-pushup","Incline push-up","push",["chair"],1,"","Hands on a desk, counter or bench."],
+ ["knee-pushup","Knee push-up","push",[],1,"","Keep hips in line with shoulders."],
+ ["decline-pushup","Decline push-up","push",["chair"],3,"","Feet on a chair, hands on the floor."],
+ ["pike-pushup","Pike push-up","push",[],3,"","Hips high, head travels in front of the hands."],
+ ["chair-dip","Bench dip","push",["chair"],2,"","Shoulders down and back, elbows point behind."],
+ ["db-press","Dumbbell floor press","push",["dumbbells"],1,"","Elbows touch the floor, press up and in."],
+ ["db-ohp","Dumbbell overhead press","push",["dumbbells"],2,"","Ribs down, press to lockout by the ears."],
+ ["bench-press","Barbell bench press","push",["barbell"],3,"","Feet planted, shoulder blades pinned."],
+ ["chest-press","Machine chest press","push",["machine"],1,"","Handles at mid-chest, smooth tempo."],
+ ["band-press","Band chest press","push",["bands"],1,"","Anchor behind you, press forward."],
+ // pull
+ ["prone-ytw","Prone Y-T-W raises","pull",[],1,"","Face down, thumbs up, lift arms through Y, T and W."],
+ ["floor-pulldown","Floor lat pulldown","pull",[],1,"","Face down, pull elbows to ribs, squeeze shoulder blades."],
+ ["towel-row","Door towel row","pull",["door"],1,"","Towel around both door handles, door shut, lean back and row."],
+ ["table-row","Under-table row","pull",["table"],2,"","Lie under a sturdy table, grip the edge, pull chest up."],
+ ["inverted-row","Inverted row","pull",["bar"],2,"","Low bar or rings, body straight, chest to bar."],
+ ["pullup","Pull-up","pull",["bar"],3,"","Dead hang to chin over bar. Use negatives if needed."],
+ ["db-row","One-arm dumbbell row","pull",["dumbbells"],1,"","Hand on a bench or knee, row to the hip."],
+ ["lat-pulldown","Lat pulldown","pull",["machine"],1,"","Pull to upper chest, lean back slightly."],
+ ["cable-row","Seated cable row","pull",["machine"],1,"","Chest tall, elbows brush the ribs."],
+ ["band-row","Band row","pull",["bands"],1,"","Anchor at chest height, pull handles to ribs."],
+ ["bb-row","Barbell row","pull",["barbell"],3,"B","Hinge to 45°, row to the belly button."],
+ // lunge
+ ["rev-lunge","Reverse lunge","lunge",[],1,"","Step back, back knee hovers, push through front heel."],
+ ["walk-lunge","Walking lunge","lunge",[],2,"SK","Long steps, torso tall."],
+ ["step-up","Step-up","lunge",["chair"],2,"","Sturdy step or bench, drive through the top leg."],
+ ["db-lunge","Dumbbell reverse lunge","lunge",["dumbbells"],2,"","Bells at your sides, controlled step back."],
+ ["lat-lunge","Lateral lunge","lunge",[],2,"","Sit into one hip, other leg straight."],
+ // core
+ ["plank","Plank","core",[],1,"","Forearms down, squeeze glutes, no sagging."],
+ ["dead-bug","Dead bug","core",[],1,"","Low back glued to the floor, opposite arm and leg reach."],
+ ["side-plank","Side plank","core",[],2,"","Stack hips, straight line head to feet."],
+ ["hollow","Hollow hold","core",[],3,"","Low back pressed down, arms and legs long."],
+ ["bird-dog","Bird dog","core",[],1,"","Reach opposite arm and leg, don't rotate."],
+ ["hang-knee","Hanging knee raise","core",["bar"],2,"","No swinging, curl the pelvis up."],
+ ["pallof","Pallof press","core",["bands"],2,"","Resist the band pulling you sideways."],
+ // cardio
+ ["jacks","Jumping jacks","cardio",[],1,"L",""],
+ ["climbers","Mountain climbers","cardio",[],2,"","Hips low, drive knees fast."],
+ ["burpees","Burpees","cardio",[],3,"LS","Chest to floor, jump at the top."],
+ ["high-knees","High knees","cardio",[],1,"L","Fast feet, knees to hip height."],
+ ["skaters","Skater hops","cardio",[],2,"LS","Bound side to side, land on one foot."],
+ ["shadow-box","Shadow boxing","cardio",[],1,"","Fast jabs and crosses, stay on the balls of your feet."],
+ ["step-jacks","Low-impact step jacks","cardio",[],1,"","Step out and back, arms overhead. Silent."],
+ ["sq-thrust","Squat thrust (no jump)","cardio",[],2,"","Hands down, step or hop feet back, stand up."],
+ ["erg","Rower or bike sprint","cardio",["cardio"],1,"","Hard effort, keep the stroke clean."],
+ ["sprints","Hill or field sprints","cardio",["open"],2,"S","20–30 m, walk back to recover."],
+ // mobility
+ ["cat-cow","Cat-cow","mobility",[],1,"","Move one vertebra at a time."],
+ ["wgs","World's greatest stretch","mobility",[],1,"","Lunge, elbow to instep, rotate open."],
+ ["9090","90/90 hip switch","mobility",[],1,"","Sit tall, rotate knees side to side."],
+ ["t-spine","Thread the needle","mobility",[],1,"","On all fours, reach under and then open up."],
+ ["squat-hold","Deep squat hold","mobility",[],1,"","Heels down, elbows push knees out."],
+ ["hip-flexor","Half-kneeling hip flexor stretch","mobility",[],1,"","Tuck the tailbone, shift forward."],
+ ["down-dog","Down dog to cobra","mobility",[],1,"","Flow between them with your breath."],
+ ["hamstring","Standing hamstring fold","mobility",[],1,"","Soft knees, let the head hang."],
+ // kettlebell
+ ["kb-swing","Kettlebell swing","hinge",["kettlebell"],2,"","Hike the bell back, snap the hips, float it to chest height."],
+ ["kb-goblet","Kettlebell goblet squat","squat",["kettlebell"],1,"","Hold the bell by the horns at your chest."],
+ ["kb-dl","Kettlebell deadlift","hinge",["kettlebell"],1,"","Bell between your feet, hips back, stand tall."],
+ ["kb-press","Single-arm kettlebell press","push",["kettlebell"],2,"","Bell rests on the forearm, press straight up."],
+ ["kb-row","Kettlebell row","pull",["kettlebell"],1,"","Staggered stance, row the bell to your hip."],
+ // loaded backpack / water jugs / suitcase
+ ["pack-squat","Backpack squat","squat",["load"],1,"","Wear the loaded pack on your front or back."],
+ ["pack-rdl","Backpack Romanian deadlift","hinge",["load"],1,"","Hold the pack by its straps, hinge with a flat back."],
+ ["pack-row","Backpack bent-over row","pull",["load"],1,"","Hinge forward, row the pack to your belly."],
+ ["pack-press","Backpack floor press","push",["load"],1,"","Lie down, press the pack up by its frame or straps."],
+ ["carry","Suitcase carry","core",["load"],1,"S","One heavy bag in one hand, walk tall, don't lean."],
+ // stairs
+ ["stair-climb","Stair intervals","cardio",["stairs"],1,"","Climb briskly, walk down to recover."],
+ ["stair-step","Stair step-up","lunge",["stairs"],1,"","Whole foot on the step, drive through the heel."],
+ ["stair-pushup","Stair incline push-up","push",["stairs"],1,"","Hands on a step, the higher the easier."],
+ // rope, towel, suspension
+ ["rope","Jump rope","cardio",["rope"],1,"LS","Small bounces, wrists turn the rope."],
+ ["towel-curl","Towel slider hamstring curl","hinge",["towel"],2,"","Heels on a towel on a smooth floor, bridge and pull heels in."],
+ ["towel-pulldown","Towel lat pulldown","pull",["towel"],1,"","Pull a towel apart hard while drawing it behind your head."],
+ ["towel-climber","Towel slider climbers","cardio",["towel"],2,"","Feet on a towel, slide knees in and out. Silent."],
+ ["trx-row","Suspension strap row","pull",["trx"],1,"","Walk your feet forward to make it harder."],
+ ["trx-press","Suspension strap chest press","push",["trx"],2,"","Lean into the straps, body in a straight line."]
+].map(([id,name,pattern,needs,lvl,flags,cue]) => ({id,name,pattern,needs,lvl,flags,cue}));
+
+const EQUIP = [["dumbbells","Dumbbells"],["bands","Bands"],["chair","Chair / bench"],["table","Sturdy table"],["door","Door"],["bar","Pull-up bar"],["barbell","Barbell & rack"],["machine","Machines & cables"],["cardio","Cardio machine"],["open","Open outdoor space"]];
+const EXTRA_TAGS = { kettlebell: "Kettlebell", load: "Backpack / heavy bag", stairs: "Stairs", rope: "Jump rope", towel: "Towel / sliders", trx: "Suspension straps" };
+// what people type -> equipment tag (null = not in the library, Claude only)
+const ITEM_MAP = [
+  [/dumb ?bells?|\bdbs?\b/, "dumbbells"], [/band/, "bands"], [/chair|bench|couch|sofa|\bbed\b|ottoman|box/, "chair"],
+  [/table|desk/, "table"], [/door/, "door"], [/pull.?up|chin.?up|monkey|rings?\b/, "bar"], [/barbell|rack|squat rack/, "barbell"],
+  [/machine|cable/, "machine"], [/treadmill|bike|rower|elliptical|erg/, "cardio"], [/field|park|yard|garden|track|beach/, "open"],
+  [/kettle|\bkb\b/, "kettlebell"], [/back ?pack|rucksack|jug|suitcase|sand ?bag|bag|gallon|bucket|bottles?/, "load"],
+  [/stair|steps?\b/, "stairs"], [/rope|skipping/, "rope"], [/towel|slider|paper plate/, "towel"], [/trx|suspension|strap/, "trx"]
+];
+const ITEM_IDEAS = ["Kettlebell","Backpack with books","Water jugs","Stairs","Jump rope","Towel","Resistance bands","Dumbbells","Pull-up bar","Suspension straps","Sandbag","Yoga mat","Medicine ball","Foam roller"];
+function tagFor(text) { const t = text.toLowerCase(); for (const [re, tag] of ITEM_MAP) if (re.test(t)) return tag; return null; }
+function equipLabel(tag) { return (EQUIP.find(q => q[0] === tag) || [])[1] || EXTRA_TAGS[tag] || tag; }
+
+/* ---------------- demo animations ---------------- */
+// stick-figure poses in a 200×150 box, floor at y=140. h head, n neck, p hip, k/f knee/foot, e/w elbow/wrist (1 = near side, 2 = far side)
+const P = (o, base) => { const r = { ...(base || {}), ...o }; for (const j of ["k","f","e","w"]) { if (o[j]) { r[j+"1"] = o[j]; r[j+"2"] = o[j]; } } return r; };
+const STAND = P({ h:[100,28], n:[100,42], p:[100,82], k:[100,111], f:[100,140], e:[102,62], w:[104,80] });
+const HINGED = P({ h:[136,62], n:[124,68], p:[90,86], k:[104,113], f:[100,140] });
+const ANIM = {
+  squat:   { a: P({ e:[112,56], w:[128,58] }, STAND), b: P({ h:[116,66], n:[110,78], p:[90,112], k:[120,114], f:[100,140], e:[128,84], w:[146,84] }) },
+  goblet:  { a: P({ e:[106,60], w:[110,48] }, STAND), b: P({ h:[116,66], n:[110,78], p:[90,112], k:[120,114], f:[100,140], e:[116,96], w:[120,84] }), prop: "hands" },
+  hinge:   { a: STAND, b: P({ e:[127,86], w:[128,104] }, HINGED), prop: "hands" },
+  swing:   { a: P({ e:[114,54], w:[128,52] }, STAND), b: P({ e:[110,92], w:[96,104] }, HINGED), prop: "hands" },
+  bridge:  { a: P({ h:[40,130], n:[52,132], p:[92,136], k:[118,114], f:[134,140], e:[70,138], w:[88,139] }), b: P({ h:[40,130], n:[52,132], p:[90,116], k:[120,110], f:[134,140], e:[70,138], w:[88,139] }) },
+  pushup:  { a: P({ h:[46,94], n:[58,100], p:[108,119], k:[134,129], f:[160,138], e:[60,119], w:[58,138] }), b: P({ h:[46,120], n:[58,126], p:[108,132], k:[134,135], f:[160,138], e:[74,124], w:[60,138] }) },
+  climber: { a: P({ h:[46,94], n:[58,100], p:[108,119], k:[134,129], f:[160,138], e:[60,119], w:[58,138] }), b: P({ h:[46,94], n:[58,100], p:[106,116], k1:[90,122], f1:[104,138], k2:[134,129], f2:[160,138], e:[60,119], w:[58,138] }) },
+  floorpress: { a: P({ h:[40,128], n:[52,130], p:[92,132], k:[112,112], f:[126,139], e:[54,112], w:[54,94] }), b: P({ h:[40,128], n:[52,130], p:[92,132], k:[112,112], f:[126,139], e:[64,139], w:[60,122] }), prop: "hands" },
+  press:   { front: true, a: P({ h:[100,28], n:[100,42], p:[100,82], k1:[96,111], f1:[94,140], k2:[104,111], f2:[106,140], e1:[84,52], w1:[84,36], e2:[116,52], w2:[116,36] }),
+             b: P({ h:[100,28], n:[100,42], p:[100,82], k1:[96,111], f1:[94,140], k2:[104,111], f2:[106,140], e1:[88,24], w1:[90,6], e2:[112,24], w2:[110,6] }), prop: "hands" },
+  dip:     { a: P({ h:[100,60], n:[96,72], p:[96,104], k:[126,118], f:[154,138], e:[86,88], w:[82,104] }), b: P({ h:[100,80], n:[96,92], p:[96,124], k:[124,128], f:[154,138], e:[78,92], w:[82,104] }), prop: "bench" },
+  row:     { a: P({ e:[125,86], w:[126,104] }, HINGED), b: P({ e:[106,76], w:[118,92] }, HINGED), prop: "hands" },
+  invrow:  { a: P({ h:[52,98], n:[64,100], p:[112,119], k:[136,129], f:[160,138], e:[64,82], w:[64,62] }), b: P({ h:[54,70], n:[66,76], p:[112,104], k:[136,121], f:[160,138], e:[78,74], w:[64,62] }), prop: "lowbar" },
+  pullup:  { front: true, a: P({ h:[100,36], n:[100,48], p:[100,88], k1:[96,114], f1:[96,138], k2:[104,114], f2:[104,138], e1:[88,30], w1:[86,14], e2:[112,30], w2:[114,14] }),
+             b: P({ h:[100,11], n:[100,24], p:[100,64], k1:[96,92], f1:[96,118], k2:[104,92], f2:[104,118], e1:[82,32], w1:[86,14], e2:[118,32], w2:[114,14] }), prop: "bar" },
+  prone:   { a: P({ h:[44,132], n:[56,134], p:[100,136], k:[128,137], f:[156,138], e:[44,134], w:[30,134] }), b: P({ h:[42,124], n:[56,128], p:[100,136], k:[128,137], f:[156,138], e:[68,122], w:[56,116] }) },
+  lunge:   { a: P({ e:[102,60], w:[104,78] }, STAND), b: P({ h:[96,51], n:[96,64], p:[96,104], k1:[122,106], f1:[122,140], k2:[86,132], f2:[64,138], e:[98,82], w:[100,100] }) },
+  plank:   { a: P({ h:[46,114], n:[58,118], p:[110,126], k:[136,132], f:[162,138], e:[58,138], w:[76,138] }), b: P({ h:[46,113], n:[58,117], p:[110,123], k:[136,131], f:[162,138], e:[58,138], w:[76,138] }) },
+  sideplank: { a: P({ h:[52,92], n:[64,100], p:[110,118], k:[136,128], f:[160,138], e1:[64,120], w1:[64,138], e2:[66,82], w2:[68,64] }), b: P({ h:[52,96], n:[64,103], p:[110,128], k:[136,133], f:[160,138], e1:[64,120], w1:[64,138], e2:[66,85], w2:[68,67] }) },
+  deadbug: { a: P({ h:[40,128], n:[52,130], p:[92,132], k:[96,106], f:[120,106], e:[54,112], w:[56,94] }), b: P({ h:[40,128], n:[52,130], p:[92,132], k1:[120,126], f1:[148,124], k2:[96,106], f2:[120,106], e1:[54,112], w1:[56,94], e2:[36,122], w2:[22,118] }) },
+  jack:    { front: true, a: P({ h:[100,28], n:[100,40], p:[100,80], k1:[96,110], f1:[94,140], k2:[104,110], f2:[106,140], e1:[92,58], w1:[88,76], e2:[108,58], w2:[112,76] }),
+             b: P({ h:[100,28], n:[100,40], p:[100,80], k1:[88,110], f1:[78,140], k2:[112,110], f2:[122,140], e1:[86,28], w1:[80,12], e2:[114,28], w2:[120,12] }) },
+  run:     { a: P({ k1:[114,98], f1:[106,124], k2:[98,111], f2:[96,140], e1:[110,58], w1:[118,46], e2:[92,58], w2:[86,70] }, STAND),
+             b: P({ k1:[98,111], f1:[96,140], k2:[114,98], f2:[106,124], e1:[92,58], w1:[86,70], e2:[110,58], w2:[118,46] }, STAND) },
+  box:     { a: P({ e:[108,54], w:[110,40] }, STAND), b: P({ e1:[118,42], w1:[136,40], e2:[108,54], w2:[110,40] }, STAND) },
+  catcow:  { a: P({ h:[52,110], n:[62,102], p:[112,104], k:[112,138], f:[140,138], e:[62,120], w:[62,138], bend: 9 }), b: P({ h:[50,92], n:[62,102], p:[112,104], k:[112,138], f:[140,138], e:[62,120], w:[62,138], bend: -8 }) }
+};
+const ANIM_FOR = {
+  "goblet-squat":"goblet","db-front-squat":"goblet","back-squat":"goblet","band-squat":"goblet","kb-goblet":"goblet","pack-squat":"goblet","jump-squat":"squat",
+  "glute-bridge":"bridge","sl-bridge":"bridge","hip-thrust":"bridge","ham-curl":"bridge","towel-curl":"bridge","kb-swing":"swing",
+  "chair-dip":"dip","db-press":"floorpress","chest-press":"floorpress","band-press":"floorpress","bench-press":"floorpress","pack-press":"floorpress","trx-press":"pushup",
+  "db-ohp":"press","kb-press":"press","prone-ytw":"prone","floor-pulldown":"prone","towel-pulldown":"press",
+  "table-row":"invrow","inverted-row":"invrow","trx-row":"invrow","towel-row":"invrow","pullup":"pullup","hang-knee":"pullup","lat-pulldown":"pullup",
+  "dead-bug":"deadbug","side-plank":"sideplank","carry":"run","bird-dog":"catcow",
+  "high-knees":"run","sprints":"run","stair-climb":"run","erg":"run","rope":"jack","climbers":"climber","sq-thrust":"climber","towel-climber":"climber","shadow-box":"box",
+  "wgs":"lunge","9090":"lunge","hip-flexor":"lunge","squat-hold":"squat","hamstring":"hinge","stair-step":"lunge","step-up":"lunge","stair-pushup":"pushup"
+};
+const PATTERN_ANIM = { squat:"squat", hinge:"hinge", push:"pushup", pull:"row", lunge:"lunge", core:"plank", cardio:"jack", mobility:"catcow" };
+const STEPS = {
+  squat: ["Feet about shoulder-width, toes slightly out.", "Brace your core, push hips back and down until thighs are at least parallel.", "Keep your chest up and knees in line with your toes, then drive up through the whole foot."],
+  hinge: ["Soft knees, weight in your heels.", "Push your hips back like closing a car door with your bum, keeping a flat back.", "Feel the stretch in your hamstrings, then squeeze your glutes to stand tall."],
+  push: ["Hands just wider than shoulders, body in one straight line.", "Lower under control with elbows about 45° from your body.", "Push away until your arms are straight without shrugging."],
+  pull: ["Set your shoulders down and back before you pull.", "Lead with your elbows and pull towards your ribs or chest.", "Pause and squeeze your shoulder blades, then lower slowly."],
+  lunge: ["Stand tall, then step into a long stance.", "Lower until both knees are about 90°, back knee hovering.", "Push through the front heel to return. Keep your torso upright."],
+  core: ["Ribs down, squeeze your glutes.", "Breathe steadily through your nose and don't hold your breath.", "Stop the set when your lower back starts to arch."],
+  cardio: ["Start at a pace you could keep for the whole interval.", "Stay light on your feet and keep breathing rhythmic.", "Push harder in the last 10 seconds if form holds."],
+  mobility: ["Move slowly and breathe out into each stretch.", "Go to mild tension, never pain.", "Repeat each side or each rep 5–8 times."]
+};
+function animFor(ex) { return ANIM[ANIM_FOR[ex.id]] ? ANIM_FOR[ex.id] : PATTERN_ANIM[ex.pattern] || "squat"; }
+function propFor(ex) {
+  const n = ex.needs || [];
+  if (n.includes("dumbbells")) return "db"; if (n.includes("kettlebell")) return "kb"; if (n.includes("barbell")) return "bb";
+  if (n.includes("load")) return "pack"; if (n.includes("bands")) return "band"; return "";
+}
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let animRunning = false;
+function startAnim() { if (!animRunning) { animRunning = true; requestAnimationFrame(frame); } }
+function frame(ts) {
+  const canvases = document.querySelectorAll("canvas.figure");
+  if (!canvases.length) { animRunning = false; return; }
+  const cs = getComputedStyle(document.documentElement);
+  const col = { ink: cs.getPropertyValue("--ink").trim(), acc: cs.getPropertyValue("--accent").trim(), line: cs.getPropertyValue("--line").trim() };
+  const t = reduceMotion ? 1 : (1 - Math.cos(ts / 2400 * Math.PI * 2)) / 2;
+  canvases.forEach(c => drawFigure(c, ANIM[c.dataset.anim] || ANIM.squat, c.dataset.prop, t, col));
+  if (!reduceMotion) requestAnimationFrame(frame); else animRunning = false;
+}
+function drawFigure(c, A, prop, t, col) {
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth || 240, H = W * .75;
+  if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const ctx = c.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
+  ctx.scale(c.width / 200, c.height / 150);
+  const pt = k => { const a = A.a[k], b = A.b[k]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
+  const bend = (A.a.bend || 0) + ((A.b.bend || 0) - (A.a.bend || 0)) * t;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  // floor and fixed props
+  ctx.strokeStyle = col.line; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(8, 141.5); ctx.lineTo(192, 141.5); ctx.stroke();
+  ctx.strokeStyle = col.acc; ctx.lineWidth = 3;
+  if (A.prop === "bar") { ctx.beginPath(); ctx.moveTo(66, 14); ctx.lineTo(134, 14); ctx.stroke(); }
+  if (A.prop === "lowbar") { ctx.beginPath(); ctx.moveTo(44, 62); ctx.lineTo(84, 62); ctx.stroke(); }
+  if (A.prop === "bench") { ctx.fillStyle = col.line; ctx.fillRect(60, 104, 26, 37); }
+  const limb = (a, b, c2) => { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c2); ctx.stroke(); };
+  const n = pt("n"), p = pt("p"), h = pt("h");
+  ctx.strokeStyle = col.ink; ctx.lineWidth = 5;
+  // far-side limbs first, faded in side views
+  ctx.globalAlpha = A.front ? 1 : .35;
+  limb(p, pt("k2"), pt("f2")); limb(n, pt("e2"), pt("w2"));
+  ctx.globalAlpha = 1;
+  // torso as a curve so the spine can round (cat-cow)
+  const mx = (n[0] + p[0]) / 2, my = (n[1] + p[1]) / 2, dx = p[0] - n[0], dy = p[1] - n[1], len = Math.hypot(dx, dy) || 1;
+  let nx = -dy / len, ny = dx / len; if (ny > 0) { nx = -nx; ny = -ny; }
+  ctx.beginPath(); ctx.moveTo(...n); ctx.quadraticCurveTo(mx + nx * bend * 2, my + ny * bend * 2, ...p); ctx.stroke();
+  limb(p, pt("k1"), pt("f1")); limb(n, pt("e1"), pt("w1"));
+  ctx.fillStyle = col.ink; ctx.beginPath(); ctx.arc(h[0], h[1], 8, 0, Math.PI * 2); ctx.fill();
+  // hand-held props
+  const w1 = pt("w1"), w2 = pt("w2"), f1 = pt("f1");
+  ctx.fillStyle = col.acc; ctx.strokeStyle = col.acc;
+  const hands = A.front ? [w1, w2] : [w1];
+  if (prop === "db") hands.forEach(w => { ctx.fillRect(w[0] - 9, w[1] - 3, 18, 6); ctx.fillRect(w[0] - 10, w[1] - 6, 5, 12); ctx.fillRect(w[0] + 5, w[1] - 6, 5, 12); });
+  if (prop === "kb") { ctx.beginPath(); ctx.arc(w1[0], w1[1] + 7, 7, 0, Math.PI * 2); ctx.fill(); }
+  if (prop === "bb") { ctx.beginPath(); ctx.arc(w1[0], w1[1], 11, 0, Math.PI * 2); ctx.lineWidth = 4; ctx.stroke(); }
+  if (prop === "pack") { ctx.fillRect(w1[0] - 8, w1[1] - 2, 16, 18); }
+  if (prop === "band") { ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(...f1); ctx.lineTo(...w1); ctx.stroke(); ctx.setLineDash([]); }
+}
+const SITUATIONS = [
+  ["gym","Full gym","Everything",["dumbbells","bands","chair","barbell","machine","bar","cardio"],[]],
+  ["home","Home","No equipment",["chair","table","door"],[]],
+  ["home-db","Home","Dumbbells",["dumbbells","chair","table","door"],[]],
+  ["hotel","Hotel room","Quiet, small",["chair","door"],["quiet","small"]],
+  ["park","Park","Bars & benches",["bar","chair","open"],[]],
+  ["office","Office","Chair, no sweat",["chair"],["quiet","small"]],
+  ["travel","Travelling","Nothing at all",[],["quiet","small"]],
+  ["busy-gym","Busy gym","DBs & bands only",["dumbbells","bands","chair"],[]]
+];
+const TIMES = [10,20,30,45,60];
+const GOALS = [["strength","Strength"],["muscle","Build muscle"],["burn","Fat loss / cardio"],["mobility","Mobility & recovery"]];
+const LEVELS = [[1,"Beginner"],[2,"Intermediate"],[3,"Advanced"]];
+const CONSTRAINTS = [["quiet","Quiet (no jumping)"],["small","Small space"],["knee","Knee-friendly"],["back","Back-friendly"]];
+const TEMPLATES = {
+  strength: ["squat","push","hinge","pull","lunge","core"],
+  muscle: ["squat","push","pull","hinge","lunge","push","pull","core"],
+  burn: ["squat","push","cardio","hinge","pull","cardio","lunge","core"],
+  mobility: ["mobility","mobility","mobility","core","mobility","mobility","mobility","core","mobility","mobility"]
+};
+
+/* ---------------- data: food ---------------- */
+// [name, where, how to order, kcal, protein g, tags]  tags: v=vegetarian, vg=vegan, gf=gluten-free, h=halal-friendly
+const FOOD = {
+ na: { label: "North America", keys:["new york","nyc","austin","chicago","toronto","los angeles","la","houston","atlanta","miami","seattle","boston","vancouver","dallas","usa","canada","denver","san francisco"],
+  out: [
+   ["Chicken burrito bowl","Chipotle-style fast casual","Half rice, <b>double fajita veg</b>, beans, salsa. Skip queso and sour cream.",620,45,"gf"],
+   ["Salmon poke bowl","Poke shops","Half rice, half greens, edamame, <b>sauce on the side</b>.",560,38,""],
+   ["Rotisserie chicken plate","Grocery hot bar","Quarter chicken, skin off, plus the salad bar and a fruit.",480,50,"gf h"],
+   ["6-inch sub, double meat","Sandwich chains","Turkey or chicken on wheat, <b>every veg</b>, mustard over mayo.",430,36,""],
+   ["Veggie egg-white omelet","Diners","Spinach, peppers, feta, fruit cup and one slice wheat toast.",390,32,"v"],
+   ["Black bean burger","Burger joints","Lettuce wrap or single bun, side salad instead of fries.",470,22,"v"]],
+  cook: [
+   ["Sheet-pan chicken thighs","Cook at home","Thighs, sweet potato, broccoli, one tray, 35 min at 220°C / 425°F.",560,42,"gf h"],
+   ["Turkey bean chili","Batch cook","Makes 5 portions, freezes well. Lean ground turkey, two cans of beans.",470,38,"gf"],
+   ["Tofu stir-fry","Cook at home","Frozen stir-fry veg, firm tofu, soy-ginger sauce, rice.",500,26,"v vg"]]},
+ uk: { label: "UK & Ireland", keys:["london","manchester","birmingham","leeds","glasgow","edinburgh","dublin","bristol","liverpool","uk","england","ireland","cardiff"],
+  out: [
+   ["Peri-peri chicken","Nando's-style grills","Half chicken or breast, <b>corn and garden salad</b> instead of chips.",610,52,"gf h"],
+   ["Smart meal deal","Tesco / Boots / Sainsbury's","Chicken salad wrap, protein pot (eggs & spinach), fruit or water.",500,36,""],
+   ["Jacket potato","Cafés & pubs","Beans plus <b>cottage cheese or tuna</b>, side salad, light on butter.",460,30,"v gf"],
+   ["Chicken teriyaki salad","Wagamama-style","Or a chicken / tofu ramen. Skip the gyoza side.",540,36,""],
+   ["Sunday roast, lighter","Pubs","Chicken or beef, <b>double veg</b>, two potatoes, gravy on the side.",650,46,""],
+   ["Grilled fish & mushy peas","Chippies that grill","Ask for grilled, or share a small chips.",560,40,"gf"]],
+  cook: [
+   ["Protein overnight oats","Prep the night before","Oats, milk, scoop of whey or Greek yoghurt, frozen berries.",420,35,"v"],
+   ["Salmon & new potatoes","Cook at home","Oven-baked salmon, new potatoes, garden peas, lemon.",560,38,"gf"],
+   ["Red lentil dhal","Batch cook","With spinach and a small portion of rice or one wholemeal pitta.",450,22,"v vg gf"]]},
+ wa: { label: "West Africa", keys:["lagos","abuja","accra","ibadan","port harcourt","kumasi","dakar","abidjan","nigeria","ghana","benin","enugu","kano"],
+  out: [
+   ["Jollof + grilled chicken","Bukas & quick-service spots","Half the rice, <b>extra protein</b>, moi moi on the side, salad over coleslaw.",640,46,"gf h"],
+   ["Suya plate","Suya spots","Lean beef suya with onions, tomatoes and cabbage. Go easy on extra yaji oil.",420,42,"gf h"],
+   ["Fish or goat pepper soup","Bars & restaurants","Broth-based and high protein. Add a small boiled yam or plantain if training hard.",320,36,"gf h"],
+   ["Efo riro with fish","Bukas","Fist-size swallow (or swap for a small rice), <b>double the stew</b>.",620,40,"gf h"],
+   ["Waakye, lighter","Ghanaian waakye stands","Egg, fish, salad, a little shito. Skip the spaghetti and extra gari.",640,34,"h"],
+   ["Beans & boli","Street vendors","Ewa or moi moi with roasted plantain (boli) instead of fried dodo.",500,22,"v vg gf"]],
+  cook: [
+   ["Batch moi moi","Batch cook","Steamed bean pudding with eggs or fish. Freezes well, 6 portions.",360,22,"v gf h"],
+   ["Grilled tilapia & plantain","Cook at home","Pepper marinade, roasted ripe plantain, cucumber-tomato salad.",520,42,"gf h"],
+   ["Lighter vegetable soup","Cook at home","Edikang ikong or efo with less palm oil, lots of fish or chicken.",480,40,"gf h"]]},
+ la: { label: "Latin America", keys:["mexico","cdmx","bogota","lima","sao paulo","são paulo","rio","buenos aires","santiago","medellin","guadalajara","quito","caracas"],
+  out: [
+   ["Corn tacos, pollo asado","Taquerías","Three on corn tortillas, salsa, onion, cilantro. Skip the crema.",450,32,"gf"],
+   ["Pollo a la brasa","Peruvian chicken shops","Quarter chicken with <b>salad instead of fries</b>, aji on the side.",560,46,"gf h"],
+   ["Prato feito","Brazilian lunch counters","Rice, beans, grilled meat, salad. Half the rice, skip farofa.",650,42,"gf"],
+   ["Ceviche + choclo","Cevicherías","Fish ceviche, corn and sweet potato. Light and high protein.",360,32,"gf"],
+   ["Reina pepiada arepa","Arepa stands","One arepa with chicken-avocado filling plus a side salad.",500,28,"gf"]],
+  cook: [
+   ["Huevos rancheros, light","Breakfast","Two eggs, black beans, corn tortillas, pico de gallo.",480,26,"v gf"],
+   ["Chicken tinga bowls","Batch cook","Shredded chicken in chipotle-tomato, over rice and lettuce.",520,44,"gf h"]]},
+ sa: { label: "South Asia", keys:["mumbai","delhi","bangalore","bengaluru","karachi","lahore","dhaka","chennai","hyderabad","kolkata","colombo","india","pakistan","pune"],
+  out: [
+   ["Tandoori chicken plate","Indian restaurants & dhabas","Tandoori or tikka (dry), dal, salad, <b>roti over naan</b>.",600,52,"h"],
+   ["Paneer tikka","Restaurants","Grilled, not in butter gravy. Add salad and mint chutney.",450,28,"v gf"],
+   ["Chana masala + roti","Thali spots","One roti, raita, salad. Go easy on the rice.",500,20,"v"],
+   ["Idli or dosa with sambar","South Indian tiffin","Plain dosa or 3 idli, <b>extra sambar</b>, light on coconut chutney.",420,14,"v vg gf"],
+   ["Grilled fish fry, dry","Coastal restaurants","Tawa fish, dal and a small rice portion.",520,40,"gf h"]],
+  cook: [
+   ["Moong dal khichdi","Cook at home","With mixed veg and a bowl of yoghurt. Easy on the stomach.",460,22,"v gf"],
+   ["Egg bhurji + roti","Breakfast","Three eggs with onion, tomato, chili. Two whole-wheat roti.",480,26,"v h"]]},
+ ea: { label: "East & Southeast Asia", keys:["tokyo","osaka","seoul","busan","beijing","shanghai","hong kong","taipei","singapore","bangkok","hanoi","ho chi minh","manila","kuala lumpur","jakarta","japan","korea"],
+  out: [
+   ["Chirashi or sashimi set","Japanese restaurants","With miso soup and edamame. Rice is the dial, adjust to your goal.",520,42,""],
+   ["Bibimbap","Korean restaurants","Ask for less rice, <b>gochujang on the side</b>, add a fried egg.",590,30,""],
+   ["Chicken pho","Vietnamese shops","Broth-heavy, extra chicken, load up the herbs and bean sprouts.",460,32,"gf"],
+   ["Steamed fish with greens","Cantonese & hawker stalls","Steamed fish or chicken, choy sum, small rice.",540,42,"gf"],
+   ["Konbini protein set","7-Eleven / Lawson / FamilyMart","Salad chicken, boiled egg, salmon onigiri, salad.",440,38,""],
+   ["Yakitori, salt-grilled","Izakaya","Order shio (salt), not tare. Mix in veg skewers.",400,36,"gf"]],
+  cook: [
+   ["Soy-ginger salmon","Cook at home","Pan-seared salmon, rice, bok choy with garlic.",560,40,""],
+   ["Kimchi egg fried rice","Cook at home","Day-old rice, kimchi, three eggs, a little sesame oil.",500,24,"v"]]},
+ me: { label: "Mediterranean & Middle East", keys:["dubai","abu dhabi","istanbul","athens","cairo","beirut","amman","riyadh","doha","rome","milan","barcelona","madrid","lisbon","tel aviv","marseille","casablanca"],
+  out: [
+   ["Shawarma plate","Shawarma shops","Chicken over salad with hummus, <b>half the bread</b>, skip the fries.",600,46,"h"],
+   ["Grilled fish + horiatiki","Tavernas","Whole grilled fish or fillet with Greek salad.",520,42,"gf h"],
+   ["Souvlaki skewers","Greek grills","Two skewers, tzatziki, salad, one pita.",480,42,"h"],
+   ["Falafel bowl","Falafel stands","Tabbouleh, hummus, pickles. Ask for baked falafel if offered.",560,18,"v vg"],
+   ["Lentil soup","Turkish lokantas","Mercimek with lemon and one slice of bread. Pair with grilled kofte for protein.",320,16,"v vg h"],
+   ["Shakshuka","Breakfast cafés","Eggs in tomato and peppers, a side of bread.",440,22,"v"]],
+  cook: [
+   ["Chickpea tuna salad","No-cook","Chickpeas, tuna, rocket, red onion, olive oil and lemon.",480,38,"gf h"],
+   ["Greek yoghurt bowl","Breakfast or snack","Greek yoghurt, honey, walnuts, fruit.",350,24,"v gf"]]}
+};
+const GRAB = [
+  ["Protein shake + banana","Any convenience store","Look for 20 g+ protein and under 10 g sugar.",300,25,"v gf"],
+  ["Boiled eggs + fruit + nuts","Corner shops, train stations","Two eggs, an apple, a small handful of nuts.",380,16,"v gf h"],
+  ["Greek yoghurt + granola","Shops & airport kiosks","Plain or low-sugar yoghurt, granola on top.",330,20,"v"],
+  ["Chicken salad or wrap","Pre-packed fridges","Pick the one with the most protein per calorie.",420,30,"h"],
+  ["Jerky + apple","Gas stations","Beef or turkey jerky, low sodium if you can find it.",260,24,"gf"],
+  ["Hummus & veg snack pack","Supermarkets, airports","Add a cheese stick or nuts for protein.",280,10,"v vg gf"],
+  ["Tuna pouch + crackers","Pharmacies, supermarkets","Lemon pepper or plain, wholegrain crackers.",320,26,"h"],
+  ["Sushi pack or rice ball","Supermarkets in Asia & UK","Salmon or tuna over the mayo-heavy options.",400,20,""]
+];
+const FOOD_SITS = [["out","Eating out"],["cook","Cooking"],["grab","Grab-and-go"]];
+const FOOD_GOALS = [["lean","Lose fat"],["muscle","Build muscle"],["maintain","Stay healthy"]];
+const DIETS = [["v","Vegetarian"],["vg","Vegan"],["h","Halal"],["gf","Gluten-free"]];
+
+/* ---------------- state ---------------- */
+const S = {
+  mode: "train", sit: "hotel", equip: new Set(["chair","door"]), time: 30, goal: "strength", level: 2,
+  cons: new Set(["quiet","small"]), seed: 7, workout: null,
+  extra: [], mySits: [], customEx: [], open: new Set(),
+  city: "Lagos", region: "wa", fsit: "out", fgoal: "lean", diets: new Set(), aiMeals: null
+};
+try {
+  const saved = JSON.parse(localStorage.getItem("fitshift") || "null");
+  if (saved) { Object.assign(S, saved, { equip: new Set(saved.equip), cons: new Set(saved.cons), diets: new Set(saved.diets), extra: saved.extra || [], mySits: saved.mySits || [], customEx: saved.customEx || [], open: new Set(), workout: null, aiMeals: null }); }
+} catch (e) {}
+function save() {
+  try { localStorage.setItem("fitshift", JSON.stringify({ ...S, equip: [...S.equip], cons: [...S.cons], diets: [...S.diets], open: [], workout: null, aiMeals: null })); } catch (e) {}
+}
+const findEx = id => EX.find(e => e.id === id) || S.customEx.find(e => e.id === id);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+/* ---------------- chips helper ---------------- */
+function chips(el, items, isOn, onClick, cls = "chip") {
+  el.innerHTML = "";
+  items.forEach(([val, label, sub]) => {
+    const b = document.createElement("button");
+    b.className = cls; b.type = "button";
+    b.setAttribute("aria-pressed", isOn(val) ? "true" : "false");
+    b.innerHTML = esc(label) + (sub ? `<small>${esc(sub)}</small>` : "");
+    b.onclick = () => onClick(val);
+    el.appendChild(b);
+  });
+}
+
+/* ---------------- workout engine ---------------- */
+function available(ex) {
+  if (!ex.needs.every(n => S.equip.has(n))) return false;
+  if (S.cons.has("quiet") && ex.flags.includes("L")) return false;
+  if (S.cons.has("small") && ex.flags.includes("S")) return false;
+  if (S.cons.has("knee") && ex.flags.includes("K")) return false;
+  if (S.cons.has("back") && ex.flags.includes("B")) return false;
+  return true;
+}
+function candidates(pattern, exclude, filter) {
+  let c = EX.filter(e => e.pattern === pattern && available(e) && !exclude.has(e.id));
+  if (filter) c = c.filter(filter);
+  return c;
+}
+function score(e, r) {
+  const fit = e.lvl <= S.level ? 3 - (S.level - e.lvl) : 1 - (e.lvl - S.level) * 2;
+  const loaded = e.needs.some(n => ["dumbbells","barbell","machine","bands","bar"].includes(n)) ? 1.2 : 0;
+  return fit + (S.goal === "mobility" ? 0 : loaded) + r() * 1.5;
+}
+function pick(pattern, used, r) {
+  const c = candidates(pattern, used);
+  if (!c.length) return null;
+  return c.map(e => [score(e, r), e]).sort((a, b) => b[0] - a[0])[0][1];
+}
+function rx(goal, pattern) {
+  const lvl = S.level;
+  if (pattern === "mobility") return { text: "60 s", min: 1 };
+  if (goal === "burn") return { text: "40 s on / 20 s off", min: 1 };
+  const sets = goal === "strength" ? (lvl >= 2 ? 4 : 3) : 3;
+  const holds = pattern === "core";
+  const reps = holds ? "30–45 s" : goal === "strength" ? (lvl === 1 ? "8–10" : "5–8") : "8–12";
+  const rest = goal === "strength" ? 90 : 60;
+  // moves are done in pairs (A1/A2), so rest overlaps with the partner move
+  return { text: `${sets} × ${reps}`, min: Math.round(sets * (40 + rest) / 60 * 0.6 * 10) / 10, sets, rest };
+}
+function warmup(r) {
+  const used = new Set(); const out = [];
+  for (const p of ["mobility","mobility",S.cons.has("quiet") ? "mobility" : "cardio"]) {
+    const e = pick(p, used, r); if (e) { used.add(e.id); out.push(e); }
+  }
+  return out.map(e => ({ ex: e, rx: "45 s", min: .75, done: false }));
+}
+function buildMain(minutes, keep) {
+  const r = rng(S.seed);
+  const tpl = TEMPLATES[S.goal];
+  const used = new Set(keep.map(k => k.ex.id));
+  const donePatterns = keep.map(k => k.ex.pattern);
+  let pats = tpl.slice();
+  for (const p of donePatterns) { const i = pats.indexOf(p); if (i >= 0) pats.splice(i, 1); }
+  const items = [];
+  if (S.goal === "burn") {
+    let stations = pats.slice(0, Math.max(3, Math.min(pats.length, Math.floor(minutes)))) ;
+    for (const p of stations) { const e = pick(p, used, r); if (e) { used.add(e.id); items.push({ ex: e, rx: "40 s on / 20 s off", min: 1, done: false }); } }
+    const rounds = Math.max(1, Math.floor(minutes / Math.max(1, items.length)));
+    return { items, rounds };
+  }
+  let spent = 0;
+  for (const p of pats) {
+    const pres = rx(S.goal, p);
+    if (items.length >= 2 && spent + pres.min > minutes + 1) break;
+    const e = pick(p, used, r); if (!e) continue;
+    used.add(e.id); spent += pres.min;
+    items.push({ ex: e, rx: pres.text, min: pres.min, done: false });
+  }
+  // short sessions: drop to 2 sets rather than skipping moves
+  if (spent > minutes + 2) items.forEach(it => { it.rx = it.rx.replace(/^\d ×/, "2 ×"); it.min = it.min * .55; });
+  return { items, rounds: 1 };
+}
+function generate(keepDone) {
+  const prev = S.workout;
+  const keep = keepDone && prev ? prev.main.filter(i => i.done) : [];
+  const wuDone = keepDone && prev && prev.warm.every(i => i.done);
+  const r = rng(S.seed + 99);
+  const warm = S.goal === "mobility" ? [] : (wuDone ? prev.warm : warmup(r));
+  const warmMin = S.goal === "mobility" ? 0 : (S.time <= 10 ? 0 : 2.5);
+  const doneMin = keep.reduce((a, k) => a + k.min, 0);
+  const mainMin = Math.max(4, S.time - warmMin - 2 - doneMin);
+  const useFocus = S.focus && (S.goal === "strength" || S.goal === "muscle");
+  const { items, rounds } = useFocus ? buildFocus(mainMin, keep) : buildMain(mainMin, keep);
+  S.workout = { warm: S.time <= 10 && !wuDone ? [] : warm, main: [...keep, ...items], rounds, adaptedFrom: keep.length };
+  renderWorkout();
+}
+function swap(idx, how) {
+  const it = S.workout.main[idx];
+  const used = new Set(S.workout.main.map(i => i.ex.id));
+  let f = null;
+  if (how === "easier") f = e => e.lvl < it.ex.lvl;
+  if (how === "harder") f = e => e.lvl > it.ex.lvl;
+  if (how === "taken") f = e => e.needs.join() !== it.ex.needs.join() || e.needs.length === 0;
+  let c = candidates(it.ex.pattern, used, f);
+  if (!c.length && how === "taken") c = candidates(it.ex.pattern, used);
+  if (!c.length) { flashNote(idx, how === "easier" ? "This is already the easiest option here." : how === "harder" ? "Nothing harder fits your setup. Slow the tempo or add a pause." : "No other option fits your setup."); return; }
+  c.sort((a, b) => Math.abs(a.lvl - it.ex.lvl) - Math.abs(b.lvl - it.ex.lvl));
+  it.ex = c[0]; it.done = false;
+  renderWorkout(idx);
+}
+function flashNote(idx, msg) {
+  const li = document.querySelector(`li[data-i="${idx}"] .ex-cue`);
+  if (li) { li.textContent = msg; li.classList.remove("flash"); void li.offsetWidth; li.classList.add("flash"); }
+}
+
+/* ---------------- render: train ---------------- */
+const GOAL_LABEL = Object.fromEntries(GOALS);
+const SIT = Object.fromEntries(SITUATIONS.map(s => [s[0], s]));
+const getSit = id => SIT[id] || (S.mySits.find(m => m.id === id) && (m => [m.id, m.name, "My place", m.equip, m.cons])(S.mySits.find(m => m.id === id)));
+let savingPlace = false;
+function renderTrainControls() {
+  const sits = [...SITUATIONS.map(s => [s[0], s[1], s[2]]), ...S.mySits.map(m => [m.id, m.name, "My place · " + m.equip.length + " items"])];
+  chips($("situations"), sits, v => S.sit === v, v => {
+    const s = getSit(v);
+    S.sit = v; S.equip = new Set(s[3]); S.cons = new Set([...s[4], ...[...S.cons].filter(c => c === "knee" || c === "back")]);
+    changed(true);
+  });
+  const mine = S.mySits.find(m => m.id === S.sit);
+  $("place-tools").innerHTML = savingPlace
+    ? `<form class="add-row" id="place-form"><input type="text" id="place-name" placeholder="Name it, e.g. My garage" aria-label="Place name" maxlength="24"><button type="submit">Save</button><button type="button" id="place-cancel">Cancel</button></form>`
+    : `<div class="chips"><button class="link-btn" id="place-save">+ Save current setup as a place</button>${mine ? `<button class="link-btn" id="place-del">Delete "${esc(mine.name)}"</button>` : ""}</div>`;
+  if (savingPlace) {
+    $("place-name").focus();
+    $("place-form").onsubmit = ev => {
+      ev.preventDefault(); const name = $("place-name").value.trim(); if (!name) return;
+      const id = "my-" + Date.now().toString(36);
+      S.mySits.push({ id, name, equip: [...S.equip], cons: [...S.cons] }); S.sit = id; savingPlace = false; renderTrainControls(); renderWorkout(); save();
+    };
+    $("place-cancel").onclick = () => { savingPlace = false; renderTrainControls(); };
+  } else {
+    $("place-save").onclick = () => { savingPlace = true; renderTrainControls(); };
+    if (mine) $("place-del").onclick = () => { S.mySits = S.mySits.filter(m => m !== mine); S.sit = "home"; renderTrainControls(); renderWorkout(); save(); };
+  }
+  // equipment: built-in items, then whatever the person added
+  const el = $("equipment"); el.innerHTML = "";
+  const addChip = (label, on, cls, onToggle, onRemove, title) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip " + (cls || "");
+    b.setAttribute("aria-pressed", on ? "true" : "false"); b.textContent = label; if (title) b.title = title;
+    b.onclick = ev => { if (ev.target.classList.contains("x")) onRemove(); else onToggle(); };
+    if (onRemove) { const x = document.createElement("span"); x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Remove " + label); x.setAttribute("role", "button"); b.appendChild(x); }
+    el.appendChild(b);
+  };
+  EQUIP.forEach(([tag, label]) => addChip(label, S.equip.has(tag), "", () => { S.equip.has(tag) ? S.equip.delete(tag) : S.equip.add(tag); changed(true); }));
+  S.extra.forEach((it, i) => {
+    const on = it.tag ? S.equip.has(it.tag) : it.on !== false;
+    addChip(it.label, on, it.tag ? "" : "unknown",
+      () => { if (it.tag) { S.equip.has(it.tag) ? S.equip.delete(it.tag) : S.equip.add(it.tag); } else it.on = !on; changed(true); },
+      () => { S.extra.splice(i, 1); if (it.tag && !S.extra.some(e => e.tag === it.tag)) S.equip.delete(it.tag); changed(true); },
+      it.tag ? "Unlocks " + equipLabel(it.tag).toLowerCase() + " moves" : "Not in the move library yet. Claude will use it when you build with Claude.");
+  });
+  $("item-ideas").innerHTML = ITEM_IDEAS.map(i => `<option value="${esc(i)}">`).join("");
+  chips($("times"), TIMES.map(t => [t, t + " min"]), v => S.time === v, v => { S.time = v; changed(true); });
+  chips($("goals"), GOALS, v => S.goal === v, v => { S.goal = v; changed(false); });
+  chips($("levels"), LEVELS, v => S.level === v, v => { S.level = v; changed(false); });
+  chips($("constraints"), CONSTRAINTS, v => S.cons.has(v), v => { S.cons.has(v) ? S.cons.delete(v) : S.cons.add(v); changed(true); });
+}
+function changed(keepDone) { renderTrainControls(); generate(keepDone); save(); }
+$("add-item").onsubmit = ev => {
+  ev.preventDefault();
+  const raw = $("item-input").value.trim(); if (!raw) return;
+  const label = raw.slice(0, 40), tag = tagFor(raw);
+  if (tag && EQUIP.some(q => q[0] === tag)) {
+    S.equip.add(tag); $("item-hint").textContent = `${label}: turned on "${equipLabel(tag)}".`;
+  } else {
+    if (!S.extra.some(e => e.label.toLowerCase() === label.toLowerCase())) S.extra.push({ label, tag, on: true });
+    if (tag) S.equip.add(tag);
+    $("item-hint").textContent = tag ? `${label} added. Moves that use it are now in the mix.` : `${label} added. The built-in planner has no moves for it yet, so use "Build with Claude" below to include it.`;
+  }
+  $("item-input").value = ""; changed(true);
+};
+
+function exRow(it, i, isMain) {
+  const e = it.ex;
+  const key = (isMain ? "m" : "w") + i + ":" + e.id;
+  const open = S.open.has(key);
+  const eq = e.custom ? "my exercise" : e.ai ? "Claude's pick" : e.needs.length ? e.needs.map(equipLabel).join(", ") : "no equipment";
+  return `<li data-i="${isMain ? i : "w" + i}" class="${it.done ? "done" : ""}">
+    <button class="check" aria-label="Mark ${esc(e.name)} done" data-act="done">✓</button>
+    <div><button class="ex-name" data-act="demo" data-key="${esc(key)}" aria-expanded="${open}">${esc(e.name)}</button><span class="ex-rx">${esc(it.rx)}</span>
+      <div class="ex-cue">${it.ease ? '<span class="pill ease">Ease in</span> ' : ""}${esc(it.cue || e.cue)} <span class="tag ${e.custom ? "mine" : ""}">${esc(eq)}</span>${isMain && musclesOf(e).primary.length ? ` <span class="tag">${esc([...musclesOf(e).primary, ...musclesOf(e).secondary].map(m => MLABEL[m]).join(" · "))}</span>` : ""}</div></div>
+    ${isMain ? `<div class="swaps"><button data-act="taken" title="Equipment busy or missing">Taken</button><button data-act="easier">Easier</button><button data-act="harder">Harder</button><button data-act="remove" aria-label="Remove ${esc(e.name)}">Remove</button></div>` : "<div></div>"}
+    ${open ? demoPanel(e) : ""}
+  </li>`;
+}
+function demoPanel(e) {
+  const steps = STEPS[e.pattern] || STEPS.core;
+  const video = "https://www.youtube.com/results?search_query=" + encodeURIComponent("how to do " + e.name + " exercise proper form");
+  const m = MEDIA.map[e.id];
+  let media = "";
+  if (m) media = `<div class="media">${m.type.startsWith("video") ? `<video src="${esc(m.url)}" controls playsinline loop muted preload="metadata"></video>` : `<img src="${esc(m.url)}" alt="Your reference for ${esc(e.name)}">`}
+      ${MEDIA.canUpload ? `<div class="links"><label class="file-label">Replace<input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" data-upload="${esc(e.id)}"></label><button class="link-btn" data-act="unmedia" data-ex="${esc(e.id)}">Remove</button></div>` : ""}</div>`;
+  else if (MEDIA.canUpload) media = `<div class="media"><label class="file-label">+ Add your own photo or short video<input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" data-upload="${esc(e.id)}"></label><span class="hint">Under 20 MB. A clip of you or your coach doing it right works best.</span></div>`;
+  return `<div class="demo">
+    <canvas class="figure" data-anim="${animFor(e)}" data-prop="${propFor(e)}" role="img" aria-label="Animated stick figure showing ${esc(e.name)}"></canvas>
+    <div class="side">
+      <ol>${e.cue ? `<li><b>${esc(e.cue)}</b></li>` : ""}${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+      <div class="links"><a href="${video}" target="_blank" rel="noopener">Watch video demos ↗</a><span class="hint">Animation shows the basic movement pattern.</span></div>
+      ${media}
+      <div class="status" data-media-status="${esc(e.id)}"></div>
+    </div>
+  </div>`;
+}
+function renderWorkout(flashIdx) {
+  const w = S.workout; if (!w) return;
+  const s = getSit(S.sit);
+  const doneCount = [...w.warm, ...w.main].filter(i => i.done).length;
+  const total = w.warm.length + w.main.length;
+  const mainLabel = S.goal === "burn" ? `Circuit · ${w.rounds} round${w.rounds > 1 ? "s" : ""}` : S.goal === "mobility" ? "Flow" : "Main sets";
+  const rest = S.goal === "strength" ? "Pair moves 1+2, 3+4… rest 60–90 s" : S.goal === "muscle" ? "Pair moves, rest 45–60 s" : S.goal === "burn" ? "Rest 60 s between rounds" : "Breathe slowly through each";
+  $("workout").innerHTML = `
+    <div class="plan-head">
+      <div><div class="meta">${esc(s ? s[1] + " · " + s[2] : "Custom")}</div><h2>${S.time}-min ${esc(S.focus && (S.goal === "strength" || S.goal === "muscle") ? S.focus.name : GOAL_LABEL[S.goal])}</h2></div>
+      <div class="meta">${doneCount}/${total} done</div>
+    </div>
+    <div class="adapt"><span class="label">Plans changed?</span>
+      <button data-adapt="less">Only ${Math.max(10, S.time - 10)} min left</button>
+      <button data-adapt="hotel">Moved to a hotel room</button>
+      <button data-adapt="quiet">Need it quiet</button>
+      <button data-adapt="tired">Feeling wiped</button>
+      <button data-adapt="reshuffle">Different moves</button>
+    </div>
+    ${S.focus && (S.goal === "strength" || S.goal === "muscle") ? `<div class="focus-line"><span class="pill ease">From "What should I train today?"</span><span class="hint">${S.focus.ease.length ? "Ease-in moves have fewer sets and a lighter-weight cue." : "Built around your freshest muscle groups."}</span><button class="link-btn" data-adapt="clearfocus">Clear focus</button></div>` : ""}
+    ${w.adaptedFrom ? `<p class="note">Kept the ${w.adaptedFrom} move${w.adaptedFrom > 1 ? "s" : ""} you already finished and rebuilt the rest around the new setup.</p>` : ""}
+    ${w.warm.length ? `<div class="block-title"><span>Warm-up</span><span>~3 min</span></div><ol class="ex">${w.warm.map((it, i) => exRow(it, i, false)).join("")}</ol>` : ""}
+    <div class="block-title"><span>${mainLabel}</span><span>${rest}</span></div>
+    <ol class="ex" id="main-list">${w.main.map((it, i) => exRow(it, i, true)).join("")}</ol>
+    ${addMoveUI()}
+    <div class="log-row"><button class="btn" id="log-btn" ${w.loggedAt ? "disabled" : ""}>${w.loggedAt ? "Logged ✓" : "Finish & log workout"}</button><span class="status" id="log-status">${w.loggedAt ? "Saved to your daily log." : "Only ticked main exercises are logged. The warm-up and unticked moves don't count."}</span></div>
+    <p class="note">Tap any exercise name to see how to do it. Cool down: 2 minutes of easy walking and a hamstring and hip flexor stretch. Stop any move that causes sharp pain.</p>`;
+  if (flashIdx != null) { const li = document.querySelector(`li[data-i="${flashIdx}"]`); if (li) li.classList.add("flash"); }
+  bindAddMove();
+  const lb = $("log-btn"); if (lb && !w.loggedAt) lb.onclick = logWorkout;
+  startAnim();
+}
+
+/* ---------------- custom workout: add / create moves ---------------- */
+const PATTERNS = [["squat","Squat"],["hinge","Hinge / deadlift"],["push","Push"],["pull","Pull"],["lunge","Lunge / single leg"],["core","Core"],["cardio","Cardio"],["mobility","Mobility"]];
+let creating = false;
+function addMoveUI() {
+  const inWorkout = new Set(S.workout.main.map(i => i.ex.id));
+  const groups = PATTERNS.map(([p, label]) => {
+    const opts = [...S.customEx.filter(e => e.pattern === p), ...EX.filter(e => e.pattern === p && available(e))].filter(e => !inWorkout.has(e.id));
+    return opts.length ? `<optgroup label="${label}">${opts.map(e => `<option value="${esc(e.id)}">${esc(e.name)}${e.custom ? " (mine)" : ""}</option>`).join("")}</optgroup>` : "";
+  }).join("");
+  return `<div class="add-move">
+    <div class="row">
+      <select id="add-select" aria-label="Add an exercise">${groups}</select>
+      <button class="small-btn" id="add-btn">+ Add move</button>
+      <button class="small-btn" id="create-toggle" aria-expanded="${creating}">${creating ? "Close" : "Create my own"}</button>
+    </div>
+    ${creating ? `<form class="create" id="create-form">
+      <label class="full">Exercise name<input type="text" id="c-name" required maxlength="50" placeholder="e.g. Sandbag shouldering"></label>
+      <label>Type<select id="c-pattern">${PATTERNS.map(([p, l]) => `<option value="${p}">${l}</option>`).join("")}</select></label>
+      <label>Sets × reps or time<input type="text" id="c-rx" value="3 × 10" maxlength="30"></label>
+      <label class="full">Coaching cue (optional)<input type="text" id="c-cue" maxlength="120" placeholder="What to focus on"></label>
+      <div class="full"><button class="btn" type="submit">Save and add to workout</button></div>
+      <div class="full hint">Saved to your exercise list. Open it afterwards to attach a photo or video of how it's done.</div>
+    </form>` : ""}
+  </div>`;
+}
+function bindAddMove() {
+  const btn = $("add-btn"); if (!btn) return;
+  btn.onclick = () => {
+    const ex = findEx($("add-select").value); if (!ex) return;
+    S.workout.main.push({ ex, rx: ex.rx || rx(S.goal, ex.pattern).text, min: 1, done: false });
+    renderWorkout(S.workout.main.length - 1);
+  };
+  $("create-toggle").onclick = () => { creating = !creating; renderWorkout(); if (creating) $("c-name").focus(); };
+  const f = $("create-form");
+  if (f) f.onsubmit = ev => {
+    ev.preventDefault();
+    const name = $("c-name").value.trim(); if (!name) return;
+    const ex = { id: "c-" + Date.now().toString(36), name, pattern: $("c-pattern").value, needs: [], lvl: S.level, flags: "", cue: $("c-cue").value.trim(), rx: $("c-rx").value.trim() || "3 × 10", custom: true };
+    S.customEx.push(ex); save();
+    S.workout.main.push({ ex, rx: ex.rx, min: 1, done: false });
+    S.open.add("m" + (S.workout.main.length - 1) + ":" + ex.id);
+    creating = false; renderWorkout(S.workout.main.length - 1);
+  };
+}
+
+/* ---------------- your own photos & videos (assets + db) ---------------- */
+const MEDIA = { map: {}, canUpload: false, db: null, assets: null };
+(async () => {
+  if (!window.claude?.use) return;
+  const [db, assets] = await Promise.all([claude.use("db").catch(() => null), claude.use("assets").catch(() => null)]);
+  if (!db) return;
+  MEDIA.db = db; MEDIA.assets = assets; MEDIA.canUpload = !!assets;
+  db.collection("media").onSnapshot(snap => {
+    MEDIA.map = {}; snap.docs.forEach(d => { if (d.exists) MEDIA.map[d.id] = d.data(); });
+    if (S.open.size) renderWorkout();
+  }, () => {});
+  if (S.open.size) renderWorkout();
+})();
+async function uploadMedia(exId, file) {
+  const st = document.querySelector(`[data-media-status="${exId}"]`);
+  const say = (t, err) => { if (st) { st.textContent = t; st.className = "status" + (err ? " err" : ""); } };
+  if (file.size > 20 * 1024 * 1024) { say("That file is over 20 MB. Trim the clip or use a photo.", true); return; }
+  say("Uploading…");
+  try {
+    const type = file.type || (file.name.toLowerCase().endsWith(".mov") ? "video/quicktime" : "");
+    const res = await MEDIA.assets.upload(file, type ? { type } : undefined);
+    const old = MEDIA.map[exId];
+    await MEDIA.db.doc("media/" + exId).set({ assetId: res.id, url: res.url, type: res.contentType, at: Date.now() });
+    if (old && old.assetId && old.assetId !== res.id) MEDIA.assets.delete(old.assetId).catch(() => {});
+  } catch (e) {
+    say(e?.code === "unsupported_type" || /type/i.test(e?.message || "") ? "That file type isn't supported. Try a JPG, PNG, MP4 or WebM." : "Upload failed. " + (e?.message || "Try again."), true);
+  }
+}
+async function removeMedia(exId) {
+  const m = MEDIA.map[exId]; if (!m) return;
+  try { await MEDIA.db.doc("media/" + exId).delete(); if (m.assetId) await MEDIA.assets.delete(m.assetId); } catch (e) {}
+}
+$("workout").addEventListener("change", ev => {
+  const inp = ev.target.closest("input[data-upload]");
+  if (inp && inp.files[0]) uploadMedia(inp.dataset.upload, inp.files[0]);
+});
+$("workout").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.adapt) {
+    const a = b.dataset.adapt;
+    if (a === "less") S.time = TIMES.filter(t => t <= Math.max(10, S.time - 10)).pop() || 10;
+    if (a === "hotel") { S.sit = "hotel"; S.equip = new Set(SIT.hotel[3]); S.cons.add("quiet"); S.cons.add("small"); }
+    if (a === "quiet") S.cons.add("quiet");
+    if (a === "tired") { S.level = Math.max(1, S.level - 1); if (S.goal === "strength") S.goal = "muscle"; }
+    if (a === "reshuffle") S.seed = Math.floor(Math.random() * 1e6);
+    if (a === "clearfocus") S.focus = null;
+    changed(a !== "reshuffle");
+    return;
+  }
+  if (b.dataset.act === "demo") { const k = b.dataset.key; S.open.has(k) ? S.open.delete(k) : S.open.add(k); renderWorkout(); return; }
+  if (b.dataset.act === "unmedia") { removeMedia(b.dataset.ex); return; }
+  const li = b.closest("li[data-i]"); if (!li || !b.dataset.act) return;
+  const key = li.dataset.i;
+  if (b.dataset.act === "remove") { S.workout.main.splice(+key, 1); S.open.clear(); renderWorkout(); return; }
+  if (b.dataset.act === "done") {
+    const it = key.startsWith("w") ? S.workout.warm[+key.slice(1)] : S.workout.main[+key];
+    it.done = !it.done; renderWorkout();
+  } else swap(+key, b.dataset.act);
+});
+
+/* ---------------- Claude-built workout (optional) ---------------- */
+let sampleP = null;
+function getSample() { if (!sampleP) sampleP = window.claude?.use ? window.claude.use("sample").catch(() => null) : Promise.resolve(null); return sampleP; }
+getSample().then(s => { if (s) { $("ai-train").hidden = false; renderFood(); } });
+
+$("ask-workout").onclick = async () => {
+  const sit = getSit(S.sit);
+  const have = [...[...S.equip].map(equipLabel), ...S.extra.filter(e => !e.tag && e.on !== false).map(e => e.label)];
+  const limits = [...S.cons].map(c => CONSTRAINTS.find(x => x[0] === c)[1]);
+  const text = ($("describe").value.trim() || `I'm at: ${sit ? sit[1] : "home"}.`) +
+    ` Equipment available: ${have.length ? have.join(", ") : "nothing, bodyweight only"}.` + (limits.length ? ` Limits: ${limits.join(", ")}.` : "");
+  const sample = await getSample(); if (!sample) return;
+  const btn = $("ask-workout"); btn.disabled = true;
+  $("train-status").className = "status"; $("train-status").textContent = "Building your session…";
+  try {
+    const out = await sample.json(
+      `You are a certified strength coach. Build one workout for this situation: "${text}".
+Goal: ${GOAL_LABEL[S.goal]}. Level: ${LEVELS.find(l => l[0] === S.level)[1]}. Default length ${S.time} minutes unless the situation says otherwise.
+Only use equipment the person actually has. Respect any injury, noise or space limits mentioned.
+Reply with JSON only: {"title": string (max 5 words), "minutes": number, "items": [{"name": string, "pattern": one of "squat","hinge","push","pull","lunge","core","cardio","mobility", "rx": string like "3 × 10" or "40 s", "cue": string (one short coaching cue)}]}. 5–9 items, warm-up moves first.`,
+      { modelTier: "quick" });
+    if (!out || !Array.isArray(out.items)) throw { message: "The reply didn't include a workout." };
+    S.workout = {
+      warm: [], rounds: 1, adaptedFrom: 0,
+      main: out.items.slice(0, 10).map((x, i) => ({ ex: { id: "ai" + i, ai: true, name: String(x.name || "Exercise"), pattern: PATTERNS.some(p => p[0] === x.pattern) ? x.pattern : "core", needs: [], lvl: S.level, flags: "", cue: String(x.cue || "") }, rx: String(x.rx || ""), min: 1, done: false }))
+    };
+    if (out.minutes) S.time = Math.round(out.minutes);
+    renderWorkout();
+    $("workout").querySelector("h2").textContent = String(out.title || "Your session");
+    $("workout").querySelector(".meta").textContent = "Built by Claude from your description";
+    $("train-status").textContent = "Done. Swaps use the built-in library, so pick a situation above to adapt it further.";
+  } catch (e) {
+    $("train-status").className = "status err";
+    $("train-status").textContent = e?.code === "not_granted" ? "Claude access was declined for this page. The built-in planner still works." : e?.code === "rate_limited" ? "Too many requests. Try again in a minute." : "Couldn't build that one. " + (e?.message || "Try rephrasing.");
+  } finally { btn.disabled = false; }
+};
+
+/* ---------------- render: eat ---------------- */
+function guessRegion(city) {
+  const c = city.toLowerCase().trim(); if (!c) return null;
+  for (const [k, r] of Object.entries(FOOD)) if (r.keys.some(key => c.includes(key))) return k;
+  return null;
+}
+function renderEatControls() {
+  $("region").innerHTML = Object.entries(FOOD).map(([k, r]) => `<option value="${k}" ${k === S.region ? "selected" : ""}>${esc(r.label)} food</option>`).join("");
+  $("city").value = S.city;
+  chips($("food-sits"), FOOD_SITS, v => S.fsit === v, v => { S.fsit = v; S.aiMeals = null; refreshFood(); });
+  chips($("food-goals"), FOOD_GOALS, v => S.fgoal === v, v => { S.fgoal = v; S.aiMeals = null; refreshFood(); });
+  chips($("diets"), DIETS, v => S.diets.has(v), v => { S.diets.has(v) ? S.diets.delete(v) : S.diets.add(v); S.aiMeals = null; refreshFood(); });
+}
+function refreshFood() { renderEatControls(); renderFood(); save(); }
+$("city").addEventListener("input", e => {
+  S.city = e.target.value; S.aiMeals = null;
+  const g = guessRegion(S.city); if (g && g !== S.region) { S.region = g; $("region").value = g; }
+  renderFood(); save();
+});
+$("region").addEventListener("change", e => { S.region = e.target.value; S.aiMeals = null; renderFood(); save(); });
+
+function dietOk(tags) {
+  const t = tags.split(" ");
+  for (const d of S.diets) {
+    if (d === "v" && !(t.includes("v") || t.includes("vg"))) return false;
+    if (d !== "v" && !t.includes(d)) return false;
+  }
+  return true;
+}
+function mealCard(m) {
+  const [name, where, order, kcal, protein] = m;
+  return `<div class="meal"><h3>${esc(name)}</h3><div class="where">${esc(where)}</div>
+    <div class="order">${order}</div>
+    <div class="macros"><span><strong>~${kcal}</strong> kcal</span><span><strong>${protein} g</strong> protein</span></div></div>`;
+}
+function renderFood() {
+  const reg = FOOD[S.region];
+  let list = S.fsit === "grab" ? GRAB : reg[S.fsit];
+  list = list.filter(m => dietOk(m[5]));
+  if (S.fgoal === "lean") list = [...list].sort((a, b) => (b[4] / b[3]) - (a[4] / a[3]));
+  if (S.fgoal === "muscle") list = [...list].sort((a, b) => b[4] - a[4]);
+  const target = S.fgoal === "lean" ? "Aim for 30–40 g protein per meal and a plate that's half vegetables." : S.fgoal === "muscle" ? "Aim for 1.6–2.2 g protein per kg of bodyweight a day, spread over 3–5 meals." : "Build plates around a palm of protein, a fist of carbs and two fists of veg.";
+  const city = S.city.trim();
+  const where = S.fsit === "grab" ? "Grab-and-go anywhere" : `${reg.label}${city ? " · " + city : ""}`;
+  const hasAI = !$("ai-train").hidden;
+  $("food").innerHTML = `
+    <div class="plan-head"><div><div class="meta">${esc(where)}</div>
+      <h2>${esc(FOOD_SITS.find(f => f[0] === S.fsit)[1])}, ${esc(FOOD_GOALS.find(f => f[0] === S.fgoal)[1].toLowerCase())}</h2></div></div>
+    <p class="note">${target}</p>
+    ${hasAI ? `<div class="ai-row"><button class="btn ghost" id="ask-food">Local picks for ${esc(city || "my city")}</button><span class="status" id="food-status">Claude suggests dishes and chains typical of your city. It doesn't see live menus.</span></div>` : ""}
+    ${S.aiMeals ? `<div class="block-title"><span>Picks for ${esc(S.aiMeals.city)}</span><span>Estimates</span></div><div class="meals">${S.aiMeals.items.map(mealCard).join("")}</div>` : ""}
+    <div class="block-title"><span>${S.fsit === "grab" ? "Works almost anywhere" : "Healthy staples"}</span><span>Macros are estimates</span></div>
+    ${list.length ? `<div class="meals">${list.map(mealCard).join("")}</div>` : `<p class="note">Nothing in this list matches every diet filter. Remove one, or ask Claude for local picks.</p>`}`;
+  const ask = $("ask-food"); if (ask) ask.onclick = askFood;
+}
+async function askFood() {
+  const sample = await getSample(); if (!sample) return;
+  const city = S.city.trim();
+  if (!city) { $("food-status").textContent = "Type your city first."; return; }
+  const btn = $("ask-food"); btn.disabled = true;
+  $("food-status").textContent = "Finding healthy options in " + city + "…";
+  const diets = [...S.diets].map(d => DIETS.find(x => x[0] === d)[1]).join(", ") || "none";
+  try {
+    const out = await sample.json(
+      `You are a sports dietitian who knows local food culture. Suggest 6 healthy meals someone can realistically get in ${city}.
+Situation: ${FOOD_SITS.find(f => f[0] === S.fsit)[1]} (eating out = local restaurants, street food and common chains; cooking = locally available ingredients; grab-and-go = convenience stores, kiosks, markets).
+Goal: ${FOOD_GOALS.find(f => f[0] === S.fgoal)[1]}. Dietary needs: ${diets}.
+Favour real local dishes over generic Western food. Name a type of place, or a well-known chain, never invent specific restaurant names.
+Reply with JSON only: [{"name": string, "where": string, "order": string (one sentence on how to order or make it healthier), "kcal": integer estimate, "protein": integer grams estimate}].`,
+      { modelTier: "quick" });
+    if (!Array.isArray(out)) throw { message: "The reply wasn't a list of meals." };
+    S.aiMeals = { city, items: out.slice(0, 8).map(m => [String(m.name || ""), String(m.where || ""), esc(m.order || ""), Math.round(+m.kcal || 0), Math.round(+m.protein || 0), ""]) };
+    renderFood();
+  } catch (e) {
+    btn.disabled = false;
+    const st = $("food-status"); st.className = "status err";
+    st.textContent = e?.code === "not_granted" ? "Claude access was declined. The staples below still apply." : e?.code === "rate_limited" ? "Too many requests. Try again in a minute." : "Couldn't get picks right now. " + (e?.message || "");
+  }
+}
+
+/* ================= TODAY: muscle readiness, log, recommendations ================= */
+const HOUR = 3600e3, DAY = 24 * HOUR, RECOVER_H = 48, STALE_D = 28;
+const MUSCLES = [["chest","Chest"],["back","Back"],["shoulders","Shoulders"],["biceps","Biceps"],["triceps","Triceps"],["quads","Quads"],["hamstrings","Hamstrings"],["glutes","Glutes"],["core","Core"]];
+const MLABEL = Object.fromEntries(MUSCLES);
+// [primary, meaningfully-worked secondary]. Stabilisers (e.g. core in a squat) are deliberately left out.
+const PATTERN_MUSCLES = { squat: [["quads","glutes"],[]], hinge: [["hamstrings","glutes"],[]], push: [["chest"],["triceps","shoulders"]], pull: [["back"],["biceps"]], lunge: [["quads","glutes"],[]], core: [["core"],[]], cardio: [[],[]], mobility: [[],[]] };
+const MUSCLE_FOR = {
+  "wall-sit": [["quads"],[]], "glute-bridge": [["glutes"],["hamstrings"]], "sl-bridge": [["glutes"],["hamstrings"]], "hip-thrust": [["glutes"],["hamstrings"]],
+  "ham-curl": [["hamstrings"],[]], "towel-curl": [["hamstrings"],["glutes"]], "band-pull": [["glutes"],["hamstrings"]], "kb-swing": [["glutes","hamstrings"],[]],
+  "bb-deadlift": [["hamstrings","glutes"],["back","quads"]],
+  "pike-pushup": [["shoulders"],["triceps"]], "db-ohp": [["shoulders"],["triceps"]], "kb-press": [["shoulders"],["triceps"]],
+  "chair-dip": [["triceps"],["chest","shoulders"]], "prone-ytw": [["back"],["shoulders"]], "floor-pulldown": [["back"],[]],
+  "towel-pulldown": [["back"],["biceps"]], "hang-knee": [["core"],[]], "carry": [["core"],[]], "pallof": [["core"],[]]
+};
+function musclesOf(ex) { const m = MUSCLE_FOR[ex.id] || PATTERN_MUSCLES[ex.pattern] || [[],[]]; return { primary: m[0], secondary: m[1] }; }
+const entryMuscles = e => new Set([...(e.muscles?.primary || []), ...(e.muscles?.secondary || [])]);
+
+/* ---- storage: browser copy always; private per-person db copy when signed in ---- */
+const LOG = { entries: [], sore: [], answers: {} };
+try { Object.assign(LOG, JSON.parse(localStorage.getItem("fitshift-log") || "{}")); } catch (e) {}
+const LOGDB = { coll: null };
+function saveLocalLog() { try { localStorage.setItem("fitshift-log", JSON.stringify(LOG)); } catch (e) {} }
+function savePrefs() { saveLocalLog(); LOGDB.coll?.doc("prefs").set({ sore: LOG.sore, answers: LOG.answers }).catch(() => {}); refreshAll(); }
+function addEntry(e) { LOG.entries.push(e); saveLocalLog(); LOGDB.coll?.doc("w-" + e.id).set(e).catch(() => {}); refreshAll(); }
+function removeEntry(id) { LOG.entries = LOG.entries.filter(e => e.id !== id); saveLocalLog(); LOGDB.coll?.doc("w-" + id).delete().catch(() => {}); refreshAll(); }
+(async () => {
+  if (!window.claude?.use) return;
+  const [db, user] = await Promise.all([claude.use("db").catch(() => null), claude.use("user").catch(() => null)]);
+  if (!db || !user) return;
+  let uid; try { uid = await user.id(); } catch (e) { return; }
+  if (!uid) return;
+  const coll = db.collection("data/users/" + uid);
+  let first = true;
+  coll.onSnapshot(snap => {
+    const docs = snap.docs.filter(d => d.exists);
+    if (first) {
+      first = false; LOGDB.coll = coll;
+      if (!docs.length && (LOG.entries.length || LOG.sore.length)) {  // move browser-only history up once
+        LOG.entries.forEach(e => coll.doc("w-" + e.id).set(e).catch(() => {}));
+        coll.doc("prefs").set({ sore: LOG.sore, answers: LOG.answers }).catch(() => {});
+        return;
+      }
+    }
+    LOG.entries = docs.filter(d => d.id.startsWith("w-")).map(d => d.data());
+    const prefs = docs.find(d => d.id === "prefs")?.data();
+    if (prefs) { LOG.sore = prefs.sore || []; LOG.answers = prefs.answers || {}; }
+    saveLocalLog(); refreshAll();
+  }, () => {});
+})();
+
+/* ---- readiness: rolling 48 h from the end of the workout ---- */
+function readiness(now) {
+  const out = {};
+  for (const [m, label] of MUSCLES) {
+    let last = null, est = false;
+    for (const e of LOG.entries) if (e.at <= now && entryMuscles(e).has(m) && (last === null || e.at > last)) { last = e.at; est = e.source === "estimate"; }
+    const since = last === null ? null : now - last;
+    const sore = LOG.sore.includes(m);
+    const status = sore ? "sore" : last === null ? "none" : since < RECOVER_H * HOUR ? "recovering" : "fresh";
+    const stale = (since !== null && since >= STALE_D * DAY) || (last === null && LOG.answers[m] === "never");
+    out[m] = { m, label, last, since, status, sore, stale, est, freshAt: last === null ? null : last + RECOVER_H * HOUR };
+  }
+  return out;
+}
+
+/* ---- recommendation ---- */
+const SPLITS = [
+  { id: "full",  name: "Full body",  req: ["chest","back","shoulders","quads","hamstrings","glutes"], order: ["quads","chest","hamstrings","back","shoulders","glutes","core","biceps","triceps"] },
+  { id: "upper", name: "Upper body", req: ["chest","back","shoulders"], order: ["chest","back","shoulders","back","chest","triceps","biceps","core"] },
+  { id: "lower", name: "Legs",       req: ["quads","hamstrings","glutes"], order: ["quads","hamstrings","glutes","quads","hamstrings","core"] },
+  { id: "push",  name: "Push: chest, shoulders, triceps", req: ["chest","shoulders","triceps"], order: ["chest","shoulders","triceps","chest","core"] },
+  { id: "pull",  name: "Pull: back, biceps", req: ["back","biceps"], order: ["back","biceps","back","core"] }
+];
+let comebackChoice = null; // null = not answered, "ease" | "normal" (for this page load)
+function recommend(now) {
+  const R = readiness(now);
+  const strength = LOG.entries.filter(e => e.at <= now && entryMuscles(e).size);
+  const newcomer = Object.values(LOG.answers).includes("never");
+  if (!strength.length && !newcomer) return { type: "ask", R };
+  const lastStrength = strength.length ? Math.max(...strength.map(e => e.at)) : null;
+  const eligible = MUSCLES.map(x => x[0]).filter(m => R[m].status === "fresh" || (R[m].status === "none" && LOG.answers[m] === "never"));
+  const unknown = MUSCLES.map(x => x[0]).filter(m => R[m].status === "none" && !LOG.answers[m]);
+  const E = new Set(eligible), U = new Set(unknown);
+  if (lastStrength !== null && now - lastStrength >= STALE_D * DAY) {
+    const full = SPLITS[0];
+    const targets = full.order.filter(m => E.has(m));
+    return { type: "comeback", R, lastStrength, split: full, targets, ease: comebackChoice === "normal" ? [] : targets, comebackChoice };
+  }
+  const rested = m => Math.min(R[m].since ?? 0, 60 * DAY);
+  const passing = SPLITS.filter(s => s.req.every(m => E.has(m)));
+  let split = passing.find(s => s.id === "full") ||
+    passing.map(s => [s.req.reduce((a, m) => a + rested(m), 0) / s.req.length, s]).sort((a, b) => b[0] - a[0])[0]?.[1];
+  // ask about unlogged muscles only when the answer could change today's pick
+  const ask = unknown.filter(m => SPLITS.some(s => s.req.includes(m) && s.req.every(x => E.has(x) || U.has(x)) && (!split || s.req.length > split.req.length || split.id !== "full")));
+  if (split) {
+    const targets = [...new Set(split.order.filter(m => E.has(m)))];
+    return { type: "split", R, split, targets, ease: targets.filter(m => R[m].stale), ask };
+  }
+  if (eligible.length) {
+    const order = SPLITS[0].order.filter(m => E.has(m));
+    return { type: "partial", R, split: { id: "partial", name: order.map(m => MLABEL[m]).join(", "), order }, targets: order, ease: order.filter(m => R[m].stale), ask };
+  }
+  const next = MUSCLES.map(x => R[x[0]]).filter(r => r.status === "recovering").map(r => r.freshAt).sort((a, b) => a - b)[0];
+  return { type: "rest", R, next, ask };
+}
+
+/* ---- wording ---- */
+function ago(ms) { const h = ms / HOUR; if (h < 1) return "under an hour ago"; if (h < 48) return Math.round(h) + " h ago"; const d = Math.floor(ms / DAY); return d + " days ago"; }
+function until(ms) { const h = Math.ceil(ms / HOUR); return h < 48 ? `in ${h} h` : `in ${Math.ceil(ms / DAY)} days`; }
+const fmtWhen = t => new Date(t).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+function reasonFor(r, now) {
+  const est = r.est ? " (your estimate)" : "";
+  if (r.sore) return "You marked it as still sore, so it's left out until you clear the flag.";
+  if (r.status === "none") return LOG.answers[r.m] === "never" ? "No training logged, and you said you haven't trained it. Start light." : "No training logged yet. Log it from the daily log if you trained it elsewhere.";
+  if (r.status === "recovering") return `Trained ${ago(r.since)}${est}. Recovering until ${fmtWhen(r.freshAt)} (${until(r.freshAt - now)}).`;
+  if (r.stale) return `Last trained ${ago(r.since)}${est}. That's 4 weeks or more, so ease back in with fewer sets and lighter weights.`;
+  return `Last trained ${ago(r.since)}${est}. More than 48 hours have passed.`;
+}
+
+/* ---- rendering ---- */
+let logFormOpen = false, confirmDel = null, logMsg = "";
+function refreshAll() { if (!$("today").hidden) renderToday(); if (S.workout) renderWorkout(); }
+function renderToday() {
+  const now = Date.now();
+  const rec = recommend(now);
+  $("ready-clock").textContent = "as of " + new Date(now).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  renderRec(rec, now);
+  renderReady(rec.R, now);
+  renderLog();
+}
+function askMuscleHTML(ms) {
+  return ms.map(m => `<div class="ask"><p>When did you last train ${MLABEL[m].toLowerCase()}?</p>
+    <div class="chips">${[["2d","In the last 2 days"],["week","3–27 days ago"],["old","4 weeks ago or more"],["never","Never / not sure"]].map(([v, l]) => `<button class="chip" data-ans="${m}:${v}">${l}</button>`).join("")}</div></div>`).join("");
+}
+function renderRec(rec, now) {
+  const el = $("rec");
+  const head = t => `<div class="plan-head"><div><div class="meta">What should I train today?</div><h2>${t}</h2></div></div>`;
+  if (rec.type === "ask") {
+    el.innerHTML = head("Let's start with your history") + `
+      <div class="ask"><p>You haven't logged a strength workout yet. When did you last strength train?</p>
+        <div class="chips">
+          <button class="chip" data-hist="week">In the last week</button>
+          <button class="chip" data-hist="month">1–4 weeks ago</button>
+          <button class="chip" data-hist="old">More than 4 weeks ago</button>
+          <button class="chip" data-hist="never">I've never strength trained</button>
+        </div>
+        <span class="hint">Your answer sets the starting point. It's labelled as an estimate in your log.</span></div>`;
+    return;
+  }
+  const R = rec.R;
+  const targetList = t => `<ul class="reasons">${t.map(m => `<li><b>${MLABEL[m]}</b><span>${rec.ease.includes(m) ? '<span class="pill ease">Ease in</span> ' : ""}${esc(reasonFor(R[m], now))}</span></li>`).join("")}</ul>`;
+  const skipped = MUSCLES.map(x => x[0]).filter(m => !rec.targets?.includes(m) && R[m].status !== "fresh" && !(R[m].status === "none" && LOG.answers[m]));
+  const skippedList = skipped.length ? `<div class="block-title"><span>Not today</span></div><ul class="reasons">${skipped.map(m => `<li><b>${MLABEL[m]}</b><span><span class="pill ${R[m].status}">${R[m].status === "none" ? "No training logged" : R[m].status}</span> ${esc(reasonFor(R[m], now))}</span></li>`).join("")}</ul>` : "";
+  const asks = rec.ask?.length ? `<div class="block-title"><span>Help me pick better</span></div>${askMuscleHTML(rec.ask)}` : "";
+  if (rec.type === "comeback") {
+    const decided = rec.comebackChoice;
+    el.innerHTML = head(decided === "normal" ? "Full body" : "Comeback full body") + `
+      <div class="banner"><p>It's been 4 weeks or more since your last logged workout. Want to ease back in?</p>
+        <div class="hint">Last logged strength workout: ${esc(fmtWhen(rec.lastStrength))}, ${ago(now - rec.lastStrength)}.</div>
+        <div class="btn-row"><button class="chip" aria-pressed="${decided !== "normal"}" data-comeback="ease">Yes, ease back in</button><button class="chip" aria-pressed="${decided === "normal"}" data-comeback="normal">No, train normally</button></div></div>
+      <p class="note">${decided === "normal" ? "Normal sets and loads. Stop a set early if anything feels off." : "Every move gets one set fewer, and the cue is about 60–70% of the weight you used before, stopping 3–4 reps short of failure."}</p>
+      ${targetList(rec.targets)}${skippedList}
+      <div class="btn-row" style="margin-top:14px"><button class="btn" data-build>Build this workout</button></div>`;
+    return;
+  }
+  if (rec.type === "rest") {
+    el.innerHTML = head("Recovery day") + `<p class="note">Everything you've trained is still recovering${rec.next ? `. The next muscle group turns fresh ${esc(fmtWhen(rec.next))} (${until(rec.next - now)})` : ""}. A walk, mobility flow or easy cardio fits today.</p>
+      <div class="btn-row"><button class="btn" data-mobility>Build a mobility session</button></div>${asks}${skippedList}`;
+    return;
+  }
+  const easeNote = rec.ease.length ? `<p class="note">${rec.ease.map(m => MLABEL[m]).join(", ")} ${rec.ease.length > 1 ? "haven't" : "hasn't"} been trained in 4 weeks or more, so those moves get fewer sets and a lighter-weight cue. The rest of the session is normal.</p>` : "";
+  el.innerHTML = head(esc(rec.type === "partial" ? "Fresh muscles only" : rec.split.name) + (rec.ease.length && rec.ease.length === rec.targets.length ? ", lighter" : "")) +
+    (rec.type === "partial" ? `<p class="note">No full split is fresh yet, so this works only the groups that are ready.</p>` : "") + easeNote +
+    targetList(rec.targets) + `<div class="btn-row" style="margin-top:14px"><button class="btn" data-build>Build this workout</button><span class="hint">Uses your current place, equipment and time from Train.</span></div>` + asks + skippedList;
+}
+function renderReady(R, now) {
+  $("ready").innerHTML = MUSCLES.map(([m, label]) => {
+    const r = R[m];
+    const pill = { fresh: "Fresh", recovering: "Recovering", sore: "Still sore", none: "No training logged" }[r.status];
+    let detail = "";
+    if (r.last !== null) detail = r.status === "recovering" ? `Fresh ${until(r.freshAt - now)} · ${fmtWhen(r.freshAt)}` : `Last trained ${ago(r.since)}${r.est ? " (est.)" : ""}`;
+    if (r.sore && r.last !== null && now >= r.freshAt) detail += ". 48 h have passed, but you flagged soreness.";
+    return `<div class="mcard"><h4>${label}</h4><span class="pill ${r.status}">${pill}</span>${r.stale && r.status !== "sore" && r.last !== null ? '<span class="pill ease">4+ weeks</span>' : ""}
+      <span class="detail">${esc(detail)}</span>
+      <button class="sore-btn" data-sore="${m}" aria-pressed="${r.sore}">${r.sore ? "Sore · clear flag" : "Still sore?"}</button></div>`;
+  }).join("");
+}
+const PRESETS = [["Upper body", ["chest","back","shoulders","biceps","triceps"]], ["Legs", ["quads","hamstrings","glutes"]], ["Full body", ["chest","back","shoulders","quads","hamstrings","glutes","core"]], ["Push", ["chest","shoulders","triceps"]], ["Pull", ["back","biceps"]], ["Core", ["core"]]];
+let outsideSel = new Set();
+function toLocalInput(t) { const d = new Date(t - new Date(t).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); }
+function renderLog() {
+  const entries = [...LOG.entries].sort((a, b) => b.at - a.at);
+  const byDay = {};
+  entries.forEach(e => { const k = new Date(e.at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }); (byDay[k] = byDay[k] || []).push(e); });
+  const src = { app: "", outside: '<span class="tag">outside the app</span>', estimate: '<span class="tag">estimate</span>' };
+  $("log").innerHTML = `<div class="plan-head"><div><div class="meta">${entries.length} logged</div><h2>Daily log</h2></div>
+      <button class="small-btn" id="outside-toggle" aria-expanded="${logFormOpen}">${logFormOpen ? "Close" : "+ Log a workout done elsewhere"}</button></div>
+    ${logMsg ? `<p class="note">${esc(logMsg)}</p>` : ""}
+    ${logFormOpen ? `<form class="outside" id="outside-form">
+      <label>When did it end?<input type="datetime-local" id="o-when" value="${toLocalInput(Date.now())}" max="${toLocalInput(Date.now())}" required></label>
+      <div><div class="label">What did you train?</div><div class="chips">${PRESETS.map(([n, ms], i) => `<button type="button" class="chip" data-preset="${i}">${n}</button>`).join("")}</div></div>
+      <div class="chips">${MUSCLES.map(([m, l]) => `<button type="button" class="chip" data-osel="${m}" aria-pressed="${outsideSel.has(m)}">${l}</button>`).join("")}</div>
+      <label>Name (optional)<input type="text" id="o-title" maxlength="50" placeholder="e.g. Gym class, climbing, PT session"></label>
+      <div class="btn-row"><button class="btn" type="submit">Save to log</button><span class="hint">Only tick muscles that were worked hard, not just used for balance.</span></div>
+    </form>` : ""}
+    ${entries.length ? Object.entries(byDay).map(([day, list]) => `<div class="log-day"><h4>${esc(day)}</h4>${list.map(e => `
+      <div class="log-entry"><div><div class="t">${new Date(e.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} ${src[e.source] || ""}</div>
+        <div class="what">${esc(e.title || "Workout")}</div>
+        <div class="mus">${entryMuscles(e).size ? [...entryMuscles(e)].map(m => MLABEL[m]).join(", ") : "No strength muscle groups"}${e.items?.length ? " · " + e.items.map(i => esc(i.name)).join(", ") : ""}</div></div>
+        <div>${confirmDel === e.id ? `<button class="small-btn" data-del-yes="${e.id}">Delete</button> <button class="link-btn" data-del-no>Keep</button>` : `<button class="link-btn" data-del="${e.id}">Delete</button>`}</div>
+      </div>`).join("")}</div>`).join("") : `<p class="note">Nothing logged yet. Finish a workout in Train and tap "Finish & log workout", or log one you did elsewhere.</p>`}`;
+}
+
+/* ---- interactions ---- */
+function estimateEntry(muscles, at, title) { addEntry({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), at, source: "estimate", title, items: [], muscles: { primary: muscles, secondary: [] } }); }
+const ALL_M = MUSCLES.map(x => x[0]);
+$("today").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  const now = Date.now();
+  if (b.dataset.hist) {
+    const h = b.dataset.hist;
+    if (h === "week") { logFormOpen = true; outsideSel = new Set(); logMsg = "Log roughly what you did and when, so today's pick can work around it."; renderToday(); $("o-when")?.focus(); return; }
+    if (h === "month") estimateEntry(ALL_M, now - 14 * DAY, "Training before using Fitshift (~2 weeks ago)");
+    if (h === "old") estimateEntry(ALL_M, now - 35 * DAY, "Training before using Fitshift (4+ weeks ago)");
+    if (h === "never") { ALL_M.forEach(m => LOG.answers[m] = "never"); S.level = 1; savePrefs(); return; }
+    return;
+  }
+  if (b.dataset.ans) {
+    const [m, v] = b.dataset.ans.split(":");
+    if (v === "never") { LOG.answers[m] = "never"; savePrefs(); return; }
+    const at = { "2d": now - DAY, week: now - 7 * DAY, old: now - 35 * DAY }[v];
+    estimateEntry([m], at, `${MLABEL[m]} before using Fitshift (estimate)`);
+    return;
+  }
+  if (b.dataset.sore) { const m = b.dataset.sore; LOG.sore = LOG.sore.includes(m) ? LOG.sore.filter(x => x !== m) : [...LOG.sore, m]; savePrefs(); return; }
+  if (b.dataset.comeback) { comebackChoice = b.dataset.comeback; renderToday(); return; }
+  if (b.hasAttribute("data-build")) {
+    const rec = recommend(now);
+    const avoid = ALL_M.filter(m => !rec.targets.includes(m));
+    S.focus = { name: rec.type === "comeback" ? (rec.ease.length ? "Comeback full body" : "Full body") : rec.type === "partial" ? "Fresh muscles" : rec.split.name, order: rec.split.order.filter(m => rec.targets.includes(m)), ease: rec.ease, avoid };
+    if (S.goal !== "strength" && S.goal !== "muscle") S.goal = "muscle";
+    setMode("train"); renderTrainControls(); generate(false); save(); scrollTo(0, 0); return;
+  }
+  if (b.hasAttribute("data-mobility")) { S.focus = null; S.goal = "mobility"; setMode("train"); renderTrainControls(); generate(false); save(); return; }
+  if (b.id === "outside-toggle") { logFormOpen = !logFormOpen; outsideSel = new Set(); logMsg = ""; renderLog(); return; }
+  if (b.dataset.preset) { outsideSel = new Set(PRESETS[+b.dataset.preset][1]); renderLog(); return; }
+  if (b.dataset.osel) { const m = b.dataset.osel; outsideSel.has(m) ? outsideSel.delete(m) : outsideSel.add(m); b.setAttribute("aria-pressed", outsideSel.has(m)); return; }
+  if (b.dataset.del) { confirmDel = b.dataset.del; renderLog(); return; }
+  if (b.dataset.delYes) { confirmDel = null; removeEntry(b.dataset.delYes); return; }
+  if (b.hasAttribute("data-del-no")) { confirmDel = null; renderLog(); return; }
+});
+$("today").addEventListener("submit", ev => {
+  if (ev.target.id !== "outside-form") return;
+  ev.preventDefault();
+  const at = new Date($("o-when").value).getTime();
+  if (!at || at > Date.now() + 60000) { logMsg = "Pick a time that isn't in the future."; renderLog(); return; }
+  if (!outsideSel.size) { logMsg = "Tick at least one muscle group, or pick a preset."; renderLog(); return; }
+  const title = $("o-title").value.trim() || "Workout outside the app";
+  logFormOpen = false; logMsg = `Logged "${title}".`;
+  addEntry({ id: Date.now().toString(36), at, source: "outside", title, items: [], muscles: { primary: [...outsideSel], secondary: [] } });
+  outsideSel = new Set();
+});
+setInterval(() => { if (!$("today").hidden && !logFormOpen) renderToday(); }, 60000);
+
+/* ---- workout side: focus-driven picking and logging ---- */
+function pickForMuscle(m, used, avoid, r) {
+  const pool = [...EX].filter(e => available(e) && !used.has(e.id) && musclesOf(e).primary.includes(m));
+  const clean = pool.filter(e => { const mm = musclesOf(e); return ![...mm.primary, ...mm.secondary].some(x => avoid.includes(x)); });
+  const c = clean.length ? clean : pool;
+  if (!c.length) return null;
+  return c.map(e => [score(e, r), e]).sort((a, b) => b[0] - a[0])[0][1];
+}
+function buildFocus(minutes, keep) {
+  const r = rng(S.seed), f = S.focus;
+  const used = new Set(keep.map(k => k.ex.id));
+  const items = []; let spent = 0;
+  for (const m of [...f.order, ...f.order]) {
+    if (items.length >= f.order.length) break;
+    const e = pickForMuscle(m, used, f.avoid, r); if (!e) continue;
+    const pres = rx(S.goal, e.pattern);
+    if (items.length >= 2 && spent + pres.min > minutes + 1) break;
+    used.add(e.id); spent += pres.min;
+    const it = { ex: e, rx: pres.text, min: pres.min, done: false };
+    if (musclesOf(e).primary.some(x => f.ease.includes(x))) {
+      it.rx = it.rx.replace(/^(\d) ×/, (s, n) => Math.max(2, n - 1) + " ×"); it.ease = true;
+      it.cue = "Ease in: about 60–70% of the weight you used before, stop 3–4 reps short of failure.";
+    }
+    items.push(it);
+  }
+  return { items, rounds: 1 };
+}
+function logWorkout() {
+  const w = S.workout;
+  const done = w.main.filter(i => i.done);   // warm-up never counts; unticked = skipped
+  if (!done.length) { $("log-status").textContent = "Tick off the exercises you finished first. Unticked ones count as skipped."; return; }
+  const prim = new Set(), sec = new Set();
+  done.forEach(i => { const mm = musclesOf(i.ex); mm.primary.forEach(m => prim.add(m)); mm.secondary.forEach(m => sec.add(m)); });
+  prim.forEach(m => sec.delete(m));
+  const at = Date.now();
+  w.loggedAt = at;
+  addEntry({ id: at.toString(36), at, source: "app", title: $("workout").querySelector("h2")?.textContent || "Workout",
+    items: done.map(i => ({ name: i.ex.name, rx: i.rx, ...musclesOf(i.ex) })), muscles: { primary: [...prim], secondary: [...sec] } });
+  const ms = [...prim, ...sec].map(m => MLABEL[m]);
+  $("log-status").textContent = ms.length ? `Logged. ${ms.join(", ")} recovering until ${fmtWhen(at + RECOVER_H * HOUR)}.` : "Logged. No strength muscle groups in this one, so readiness is unchanged.";
+}
+
+/* ---------------- mode switch ---------------- */
+function setMode(m) {
+  S.mode = m;
+  for (const k of ["today","train","eat"]) { $(k).hidden = m !== k; $("mode-" + k).setAttribute("aria-pressed", m === k); }
+  if (m === "today") renderToday();
+  document.body.classList.toggle("eat", m === "eat");
+  save();
+}
+$("mode-train").onclick = () => setMode("train");
+$("mode-today").onclick = () => setMode("today");
+$("mode-eat").onclick = () => setMode("eat");
+
+renderTrainControls(); generate(false);
+renderEatControls(); renderFood();
+setMode(S.mode);
+</script>
+
+<script src="standalone.js"></script>
+</body>
+</html>
